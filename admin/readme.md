@@ -381,116 +381,335 @@ __安装编辑插件__
     <script id="container" name="content" type="text/plain"></script>
 
 
-#### 创建控制器
-
+#### 创建发布问题控制器
+	// 创建控制器
     php artisan make:controller Home\\QuestionsController --resource
     // 查看路由
     php artisan route:list
 
+    * 验证方法一：
     // 编辑控制器
     <?php
 
-    namespace App\Http\Controllers\Home;
+	namespace App\Http\Controllers\Home;
+	
+	use Illuminate\Http\Request;
+	use App\Http\Controllers\Controller;
+	use App\models\Question;
+	use App\Http\Requests\QuestionRequest;
+	use Auth;
+	
+	
+	class QuestionsController extends Controller
+	{
+	    /**
+	     * Display a listing of the resource.
+	     *
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function index()
+	    {
+	        return 'index';
+	    }
+	
+	    /**
+	     * Show the form for creating a new resource.
+	     *
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function create()
+	    {
+	        return view('questions.make');
+	    }
+	
+	    /**
+	     * Store a newly created resource in storage.
+	     *
+	     * @param  \Illuminate\Http\Request  $request
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function store(Request $request)
+	    {
+	        // 定义验证规则
+	        $rules = [
+	            'title' => 'required|min:6|max:196',
+	            'body' => 'required|min:26',
+	        ];
+	        // 自定义消息
+	        $message = [
+	            'title.required' => '标题不能为空',
+	            'title.min' => '标题不能少于6个字',
+	            'body.required' => '内容不能为空',
+	            'body.min' => '内容不能少于26个字',
+	        ];
+	        // 对用户提交数据进行验证
+	        $this->validate($request, $rules, $message);
+	        $data = [
+	            'title' => $request->get('title'),
+	            'body' => $request->get('body'),
+	            'user_id' => Auth::id()
+	        ];
+	
+	
+	        $question = Question::create($data);
+	
+	        return redirect()->route('question.show',[$question->id]);
+	    }
+	
+	    /**
+	     * Display the specified resource.
+	     *
+	     * @param  int  $id
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function show($id)
+	    {
+	        $question = Question::find($id);
+	
+	        // compact 创建一个包含变量名和它们的值的数组
+	        return view('questions.show',compact('question'));
+	    }
+	
+	    /**
+	     * Show the form for editing the specified resource.
+	     *
+	     * @param  int  $id
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function edit($id)
+	    {
+	        //
+	    }
+	
+	    /**
+	     * Update the specified resource in storage.
+	     *
+	     * @param  \Illuminate\Http\Request  $request
+	     * @param  int  $id
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function update(Request $request, $id)
+	    {
+	        //
+	    }
+	
+	    /**
+	     * Remove the specified resource from storage.
+	     *
+	     * @param  int  $id
+	     * @return \Illuminate\Http\Response
+	     */
+	    public function destroy($id)
+	    {
+	        //
+	    }
+	}
 
-    use Illuminate\Http\Request;
-    use App\Http\Controllers\Controller;
-    use App\models\Question;
-    use Auth;
 
+	* 方法二：
+	// 方法一中，验证规则直接写在控制器中，这样代码显得比较臃肿。
+	// 在方法二中，增加了对发布问题请求验证
+	// 创建发布问题请求 验证
+	php artisan make:request QuestionRequest
+
+	// QuestionRequest.php
+	<?php
+	
+	namespace App\Http\Requests;
+	
+	use Illuminate\Foundation\Http\FormRequest;
+	
+	class QuestionRequest extends FormRequest
+	{
+	    /**
+	     * Determine if the user is authorized to make this request.
+	     *
+	     * @return bool
+	     */
+	    public function authorize()
+	    {
+	        // true 允许每个都可以发布问题
+	        return true;
+	    }
+	
+	    /**
+	     * 自定义消息提示
+	     */
+	    public function messages()
+	    {
+	        return [
+	            'title.required' => '标题不能为空',
+	            'title.min' => '标题不能少于6个字',
+	            'body.required' => '内容不能为空',
+	            'body.min' => '内容不能少于26个字',
+	        ];
+	    }
+	
+	    /**
+	     * Get the validation rules that apply to the request.
+	     * 对请求进行验证
+	     * @return array
+	     */
+	    public function rules()
+	    {
+	        return [
+	            'title' => 'required|min:6|max:196',
+	            'body' => 'required|min:26',
+	        ];
+	    }
+	}
+
+	* 对 QuestionsController.php 控制器 store部分进行修改
+
+	public function store(QuestionRequest $request)
+    {
+        $data = [
+            'title' => $request->get('title'),
+            'body' => $request->get('body'),
+            'user_id' => Auth::id()
+        ];
+
+        $question = Question::create($data);
+
+        return redirect()->route('question.show',[$question->id]);
+    }
+
+#### 美化编辑器
+
+[https://github.com/JellyBool/simple-ueditor](https://github.com/JellyBool/simple-ueditor)
+
+    * clone 代码
+    git clone https://github.com/JellyBool/simple-ueditor.git
+
+    * 用此项目的 ueditor 目录替换原来的 ueditor 目录
+
+    * 实例化编辑器的时候配置 toolbar ，主要是 toolbar 的配置
+
+    var ue = UE.getEditor('editor', {
+        toolbars: [
+                ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+            ],
+        elementPathEnabled: false,
+        enableContextMenu: false,
+        autoClearEmptyNode:true,
+        wordCount:false,
+        imagePopup:false,
+        autotypeset:{ indent: true,imageBlockLine: 'center' }
+    });
+
+[文档说明](fex.baidu.com/ueditor/#start-config)
+
+#### 访问限制
+
+    * 同一控制器里有的方法允许访问，有的需要受限制。
+    * 这里我们在 QuestionsController 控制器里添加构造方法
+    * 通过这个构造方法实现用户在创建问题前需要先登录的功能
 
     class QuestionsController extends Controller
     {
-        /**
-         * Display a listing of the resource.
-         *
-         * @return \Illuminate\Http\Response
-         */
-        public function index()
-        {
-            return 'index';
+        public function __construct()
+        {   // except 表示 index、show 两个方法不受中间件影响
+            $this->middleware('auth')->except(['index','show']);
         }
 
-        /**
-         * Show the form for creating a new resource.
-         *
-         * @return \Illuminate\Http\Response
-         */
-        public function create()
-        {
-            return view('questions.make');
-        }
+    }
+
+#### 为问题添加话题
+    // 生成标签model 和相应的数据库表
+    php artisan make:model models\\Topic -m
+
+    // 生成 questions、topics 多对多关联关系表
+    php artisan make:migration create_questions_topics_table --create=question_topic
+
+    // 创建数据库表
+    php artisan migrate
+
+    // 添加多对多关系
+    class Topic extends Model
+    {
+        protected $fillable = ['name', 'questions_count'];
 
         /**
-         * Store a newly created resource in storage.
-         *
-         * @param  \Illuminate\Http\Request  $request
-         * @return \Illuminate\Http\Response
+         * 定义多对多关系
          */
-        public function store(Request $request)
+        public function questions()
         {
-            $data = [
-                'title' => $request->get('title'),
-                'body' => $request->get('body'),
-                'user_id' => Auth::id()
-            ];
-
-            $question = Question::create($data);
-
-            return redirect()->route('question.show',[$question->id]);
-        }
-
-        /**
-         * Display the specified resource.
-         *
-         * @param  int  $id
-         * @return \Illuminate\Http\Response
-         */
-        public function show($id)
-        {
-            $question = Question::find($id);
-
-            // compact 创建一个包含变量名和它们的值的数组
-            return view('questions.show',compact('question'));
-        }
-
-        /**
-         * Show the form for editing the specified resource.
-         *
-         * @param  int  $id
-         * @return \Illuminate\Http\Response
-         */
-        public function edit($id)
-        {
-            //
-        }
-
-        /**
-         * Update the specified resource in storage.
-         *
-         * @param  \Illuminate\Http\Request  $request
-         * @param  int  $id
-         * @return \Illuminate\Http\Response
-         */
-        public function update(Request $request, $id)
-        {
-            //
-        }
-
-        /**
-         * Remove the specified resource from storage.
-         *
-         * @param  int  $id
-         * @return \Illuminate\Http\Response
-         */
-        public function destroy($id)
-        {
-            //
+            return $this->belogsToMany(Question::class)->withTimestamps();
         }
     }
 
-    // 编辑路由
-    Route::resource('questions', 'Home\QuestionsController', ['names'=>[
-        'create' => 'question.create',
-        'show' => 'question.show',
-    ]]);
 
+    class Question extends Model
+    {
+        protected $fillable = ['title', 'body', 'user_id'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function topics()
+        {
+            return $this->belogsToMany(Topic::class)->withTimestamps();
+        }
+    }
+
+    // 添加 select2 到本地实现话题标签
+    * 首先下载select2 相关样式文件
+        // 1、进入到相应的文件夹目录下
+        cd resources/assets
+        // 2、查看目录情况
+        ls
+        // 3、如果没有css文件夹，新建一个
+        mkdir css
+        // 4、进入到 css 文件夹下
+        cd css
+        // 5、添加 css 样式下载路径并下载
+        wget https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css
+        // 6、进入 js 文件夹 添加 js 样式下载路径并下载
+        wget https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js
+        // 7、安装完成后 执行命令安装相应的包
+        npm install
+        // 8、配置select2样式文件
+        在 resources/assets/js 目录下 bootstrap.js 文件中添加
+        window.$ = window.jQuery = require('jquery');
+        require('bootstrap-sass');
+        require('./select2.min');
+
+        在 resources/assets/sass 目录下 app.scss 文件中添加
+        @import "./../css/select2.min";
+
+        // 执行 gulp
+
+        // select2 样式添加完成后，开始添加相应方法
+        * 添加多选css
+        <select class="js-example-basic-multiple" multiple="multiple">
+            <option value="AL">Alabama</option>
+                ...
+            <option value="WY">Wyoming</option>
+        </select>
+
+        * 添加多选js
+        <script type="text/javascript">
+            $(".js-example-basic-multiple").select2();
+        </script>
+
+    // 在gulpfile.js 文件中添加 加载样式路径 压缩样式文件、避免浏览器缓存
+    elixir((mix) => {
+        mix.sass('app.scss')
+           .webpack('app.js');
+
+        mix.version(['js/app.js', 'css/app.css'])
+    });
+
+    // 在 resources/views/layouts 目录下 app.blade.php 文件中添加
+    <link href="{{ elixir('css/app.css') }}" rel="stylesheet">
+    <script src="{{ elixir('js/app.js') }}"></script>
+
+    // 执行 gulp 命令
+    // 在 resources/views/layouts 目录下 app.blade.php 文件中添加 @yield('js')
+    // @yield('js') 相关代码在 resources/views/questions 目录下 make.blade.php 中
+    
+
+
+[http://select2.github.io/](http://select2.github.io/)
+
+    // QuestionsController 控制器添加方法

@@ -5,11 +5,17 @@ namespace App\Http\Controllers\Home;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\models\Question;
+use App\Http\Requests\QuestionRequest;
 use Auth;
 
 
 class QuestionsController extends Controller
 {
+    public function __construct()
+    {   // except 表示 index、show 两个方法不受中间件影响
+        $this->middleware('auth')->except(['index','show']);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -36,16 +42,18 @@ class QuestionsController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(QuestionRequest $request)
     {
+        // 获取数据
         $data = [
             'title' => $request->get('title'),
             'body' => $request->get('body'),
             'user_id' => Auth::id()
         ];
 
+        // 写入数据库
         $question = Question::create($data);
-
+        // 返回视图
         return redirect()->route('question.show',[$question->id]);
     }
 
