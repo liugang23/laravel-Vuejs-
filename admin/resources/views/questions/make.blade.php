@@ -19,7 +19,9 @@
 								</span>
 							@endif
                 		</div>
-
+                        <div class="form-group">
+                            <select class="js-example-placeholder-multiple js-data-example-ajax form-control" multiple="multiple"></select>
+                        </div>
                 		<div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
                 			<label for="body">描述</label>
 		                    <!-- 编辑器容器 -->
@@ -41,7 +43,7 @@
     </div>
 </div>
 
-
+@section('js')
 <!-- 实例化编辑器 -->
 <script type="text/javascript">
     var ue = UE.getEditor('container', {
@@ -59,8 +61,47 @@
         ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
     });
 
-</script>
+    $(document).ready(function() {
+        function formatTopic (topic) {
+            return "<div class='select2-result-repository clearfix'>"+
+            "<div class='select2-result-repository__meta'>" +
+            "<div class='select2-result-repository__title'>" +
+            topic.name ? topic.name : "Laravel" +
+            "<div></div></div>";
+        }
 
+        function formatTopicSelection (topic) {
+            // 这里的name是后端返回的  如果后端没有返回name，这里就显示用户输入的text
+            return topic.name || topic.text;
+        }
+
+        $(".js-example-placeholder-multiple").select2({
+            tags: true,
+            placeholder: '选择相关话题',
+            minimumInputLength: 2,
+            ajax: {
+                url:'/api/topics',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term
+                    };
+                },
+                processResults: function (data, params) {
+                    return {
+                        results: data
+                    };
+                },
+                cache: true
+            },
+            templateResult: formatTopic,// 返回样式
+            templateSelection: formatTopicSelection,// 返回样式
+            escapeMarkup: function (markup) { return markup; }
+        });
+    });
+</script>
+@endsection
 
 @endsection
 

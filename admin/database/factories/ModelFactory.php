@@ -22,3 +22,13 @@ $factory->define(App\User::class, function (Faker\Generator $faker) {
         'remember_token' => str_random(10),
     ];
 });
+
+// 生成话题测试数据
+$factory->define(App\Models\Topic::class, function (Faker\Generator $faker) {
+
+    return [
+        'name' => $faker->word,
+        'bio' => $faker->paragraph,
+        'questions_count' => 1
+    ];
+});

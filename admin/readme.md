@@ -654,6 +654,8 @@ __安装编辑插件__
 
     // 添加 select2 到本地实现话题标签
     * 首先下载select2 相关样式文件
+    * 添加select2 样式文件方法有两种
+    * 第一种：(此方法目前报错，具体问题待查)
         // 1、进入到相应的文件夹目录下
         cd resources/assets
         // 2、查看目录情况
@@ -679,19 +681,6 @@ __安装编辑插件__
 
         // 执行 gulp
 
-        // select2 样式添加完成后，开始添加相应方法
-        * 添加多选css
-        <select class="js-example-basic-multiple" multiple="multiple">
-            <option value="AL">Alabama</option>
-                ...
-            <option value="WY">Wyoming</option>
-        </select>
-
-        * 添加多选js
-        <script type="text/javascript">
-            $(".js-example-basic-multiple").select2();
-        </script>
-
     // 在gulpfile.js 文件中添加 加载样式路径 压缩样式文件、避免浏览器缓存
     elixir((mix) => {
         mix.sass('app.scss')
@@ -707,9 +696,256 @@ __安装编辑插件__
     // 执行 gulp 命令
     // 在 resources/views/layouts 目录下 app.blade.php 文件中添加 @yield('js')
     // @yield('js') 相关代码在 resources/views/questions 目录下 make.blade.php 中
+
+    * 第二种方法直接将select2 的样式文件放到public相应目录下并在app.blade.php 文件中引入
+
+    // 调试多选功能
+        * 添加多选php 代码
+        <select class="js-example-basic-multiple" multiple="multiple">
+            <option value="AL">Alabama</option>
+                ...
+            <option value="WY">Wyoming</option>
+        </select>
+
+        * 添加多选js 代码
+        <script type="text/javascript">
+            $(".js-example-basic-multiple").select2();
+        </script>
+
+        // resources/views/questions/make 具体示例：
+        @extends('layouts.app')
+
+        @section('content')
+        @include('vendor.ueditor.assets')
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">发布问题</div>
+                        <div class="panel-body">
+                            <form action="/questions" method="post">
+                                {!! csrf_field() !!}
+                                <div class="form-group{{ $errors->has('title') ? 'has-error' : '' }}">
+                                    <label for="title">标 题</label>
+                                    <input type="text" value="{{ old('title') }}" name="title" class="form-control" placeholder="标题" id="title">
+                                    @if ($errors->has('title'))
+                                        <span class="help-block">
+                                            <strong>{{ $errors->first('title') }}</strong>
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="form-group">
+                                    <select class="js-example-basic-multiple" multiple="multiple">
+                                        <option value="AL">Alabama</option>
+                                        <option value="WY">Wyoming</option>
+                                    </select>
+                                </div>
+                                <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                    <label for="body">描述</label>
+                                    <!-- 编辑器容器 -->
+                                    <!-- 非转义可能引起攻击,需要过滤 -->
+                                    <script id="container" name="body" type="text/plain" style="height:200px;">
+                                        {!! old('body') !!}
+                                    </script>
+                                    @if ($errors->has('body'))
+                                        <span class="help-block">
+                                            <strong>{{ $errors->first('body') }}</strong>
+                                        </span>
+                                    @endif
+                                </div>
+                                <button class="btn btn-success pull-right" type="submit">发布问题</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @section('js')
+        <!-- 实例化编辑器 -->
+        <script type="text/javascript">
+            var ue = UE.getEditor('container', {
+                toolbars: [
+                        ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                    ],
+                elementPathEnabled: false,
+                enableContextMenu: false,
+                autoClearEmptyNode:true,
+                wordCount:false,
+                imagePopup:false,
+                autotypeset:{ indent: true,imageBlockLine: 'center' }
+            });
+            ue.ready(function() {
+                ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+            });
+
+            $(document).ready(function() {
+                $(".js-example-basic-multiple").select2();
+            });
+        </script>
+        @endsection
+
+        @endsection
+
+
+
     
-
-
 [http://select2.github.io/](http://select2.github.io/)
 
-    // QuestionsController 控制器添加方法
+#### 调试话题功能
+    * 生成话题测试数据
+    $factory->define(App\Topic::class, function (Faker\Generator $faker) {
+
+        return [
+            'name' => $faker->word,
+            'bio' => $faker->paragraph,
+            'questions_count' => 1
+        ];
+    });
+
+    * 定义话题 model
+    class Topic extends Model
+    {
+        protected $fillable = ['name', 'questions_count', 'bio'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function questions()
+        {
+            return $this->belogsToMany(Question::class)->withTimestamps();
+        }
+    }
+
+    * 执行命令生成测试数据
+        1、首先执行 php artisan tinker
+[php artisan tinker](http://www.tuicool.com/articles/RVfuIjE)
+    
+        2、执行命令 生成10条测试数据
+        执行 factory(App\Models\Topic::class,10)->make()
+
+        3、执行命令 填充数据
+        执行 factory(App\Models\Topic::class,10)->create()
+
+        4、修改 routes/api 路由
+        Route::get('/topics', function (Request $request) {
+            $topics = \App\Models\topic::select(['id', 'name'])
+                    ->where('name', 'like', '%'.$request->query('q').'%')
+                    ->get();
+            return $topics;
+        })->middleware('api');
+
+        5、浏览器中输入 http://www.zt.com/api/topics?q=laravel 查看返回结果
+
+    * resources/questions/make 添加ajax方法实现数据实时模糊查询
+
+    @extends('layouts.app')
+
+    @section('content')
+    @include('vendor.ueditor.assets')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">发布问题</div>
+                    <div class="panel-body">
+                        <form action="/questions" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('title') ? 'has-error' : '' }}">
+                                <label for="title">标 题</label>
+                                <input type="text" value="{{ old('title') }}" name="title" class="form-control" placeholder="标题" id="title">
+                                @if ($errors->has('title'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('title') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="form-group">
+                                <select class="js-example-placeholder-multiple js-data-example-ajax form-control" multiple="multiple"></select>
+                            </div>
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <label for="body">描述</label>
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:200px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">发布问题</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+
+        $(document).ready(function() {
+            function formatTopic (topic) {
+                return "<div class='select2-result-repository clearfix'>"+
+                "<div class='select2-result-repository__meta'>" +
+                "<div class='select2-result-repository__title'>" +
+                topic.name ? topic.name : "Laravel" +
+                "<div></div></div>";
+            }
+
+            function formatTopicSelection (topic) {
+                // 这里的name是后端返回的  如果后端没有返回name，这里就显示用户输入的text
+                return topic.name || topic.text;
+            }
+
+            $(".js-example-placeholder-multiple").select2({
+                tags: true,
+                placeholder: '选择相关话题',
+                minimumInputLength: 2,
+                ajax: {
+                    url:'/api/topics',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            q: params.term
+                        };
+                    },
+                    processResults: function (data, params) {
+                        return {
+                            results: data
+                        };
+                    },
+                    cache: true
+                },
+                templateResult: formatTopic,// 返回样式
+                templateSelection: formatTopicSelection,// 返回样式
+                escapeMarkup: function (markup) { return markup; }
+            });
+        });
+    </script>
+    @endsection
+
+    @endsection
+
+
+
+

@@ -12,6 +12,7 @@
 
     <!-- Styles -->
     <link href="/css/app.css" rel="stylesheet">
+    <link href="/css/select2.min.css" rel="stylesheet">
 
     <!-- Scripts -->
     <script>
@@ -83,5 +84,7 @@
 
     <!-- Scripts -->
     <script src="/js/app.js"></script>
+    @yield('js')
+    <script src="/js/select2.min.js"></script>
 </body>
 </html>

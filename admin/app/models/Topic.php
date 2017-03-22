@@ -1,12 +1,12 @@
 <?php
 
-namespace App\models;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
 class Topic extends Model
 {
-    protected $fillable = ['name', 'questions_count'];
+    protected $fillable = ['name', 'questions_count', 'bio'];
 
     /**
      * 定义多对多关系
