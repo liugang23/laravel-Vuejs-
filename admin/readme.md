@@ -1118,7 +1118,7 @@ __安装编辑插件__
                         {{ $question->title }}
                         <span style="margin-left:10px">
                         @foreach($question->topics as $topic)
-                            <span class="topic">{{ $topic->name }}</span>
+                            <a class="topic" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
                         @endforeach
                         </span>
                     </div>
@@ -1132,12 +1132,28 @@ __安装编辑插件__
     </div>
     <style>
         .panel-body img { width: 100%;}
-        .topic {
-            margin-right: 5px;
-            background-color: #F5F8FA;
-         };
+        a.topic {
+            background-color: #eff6fa;
+            padding: 1px 10px 0;
+            border-radius: 30px;
+            text-decoration: none;
+            margin: 0 5px 5px 0;
+            display: inline-block;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        a.topic:hover {
+            background: #259;
+            color: #fff;
+            text-decoration: none;
+        }
+
     </style>
     @endsection
+
+#### 使用Repository模式
+
+    
 
 
 
