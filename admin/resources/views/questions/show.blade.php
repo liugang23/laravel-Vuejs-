@@ -18,17 +18,16 @@
                 <div class="edit-actions">
                     @if(Auth::check() && Auth::user()->owns($question))
                         <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                        <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                            {{ method_field('DELETE') }}
+                            {{ csrf_field() }}
+                            <button class="button is-naked delete-button">删 除</button>
+                        </form>
                     @endif
                 </div>
             </div>
         </div>
     </div>
 </div>
-<style>
-.actions {
-    display: flex;
-    padding: 10px 20px;
-}
-</style>
 
 @endsection

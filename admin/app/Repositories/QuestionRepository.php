@@ -28,11 +28,23 @@ class QuestionRepository
 	}
 
     /**
-     * 获取问题
+     * 获取指定问题
      */
     public function getQuestion($id)
     {
         return Question::find($id);   
+    }
+
+    /**
+     * 获取全部问题
+     */
+    public function getQuestionsFeed()
+    {   // 返回指定范围数据 并关联相应的发布者
+        // latest 在 vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:1163
+        // latest 按时间戳排序
+        // wiht 预加载
+        return Question::published()
+               ->latest('updated_at')->with('user')->get();
     }
 
     /**
