@@ -20,12 +20,20 @@ class QuestionRepository
 	}
 
 	/**
-	 * 添加
+	 * 添加问题
 	 */
 	public function addQuestion(array $attributes)
 	{
 		return Question::create($attributes);
 	}
+
+    /**
+     * 获取问题
+     */
+    public function getQuestion($id)
+    {
+        return Question::find($id);   
+    }
 
     /**
      * 查询话题

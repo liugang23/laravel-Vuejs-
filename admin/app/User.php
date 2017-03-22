@@ -6,6 +6,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Naux\Mail\SendCloudTemplate;
 use Mail;
+use Illuminate\Database\Eloquent\Model;
 
 class User extends Authenticatable
 {
@@ -28,6 +29,15 @@ class User extends Authenticatable
     protected $hidden = [
         'password', 'remember_token',
     ];
+
+    /**
+     * 判断登录者与问题发布者是否相同
+     */
+    public function owns(Model $model)
+    {
+        return $this->id == $model->user_id;
+    }
+
 
     /**
      * laravel 不支持sendCloud 模板 重写重置密码邮件发送

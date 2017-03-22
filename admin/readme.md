@@ -1151,7 +1151,185 @@ __安装编辑插件__
     </style>
     @endsection
 
-#### 使用Repository模式
+#### 使用Repository模式 实现控制器与model分离
+
+    * 新建 Repositories 目录 创建 QuestionRepository.php
+
+    <?php
+    namespace App\Repositories;
+
+    use App\Models\Question;
+    use App\Models\Topic;
+
+
+    class QuestionRepository
+    {
+        /**
+         * 获取话题
+         * @param $id
+         * @return mixed
+         */
+        public function getIdWithTopics($id)
+        {
+            // 使用 with 方法指定想要预载入的关联对象 预载入可以大大提高程序的性能
+            // 这里的 topics 是App\Models\Question 中的 topics 方法
+            return Question::where('id',$id)->with('topics')->first();
+        }
+
+        /**
+         * 添加问题
+         */
+        public function addQuestion(array $attributes)
+        {
+            return Question::create($attributes);
+        }
+
+        /**
+         * 查询话题
+         */
+        public function normalizeTopic(array $topics)
+        {
+            // 调用laravel自带的collect方法
+            return collect($topics)->map(function ($topic) {
+                if ( is_numeric($topic) ) {// 是否为数字
+                    // 如果存在 这里需要更新 increment用于递增
+                    // increment('votes', 5);加五
+                    Topic::find($topic)->increment('questions_count');
+                    return (int) $topic;
+                }
+
+                // 如果 $topic 不是数字 说明是用户新添加的 则在数据库中新建一个
+                $newTopic = Topic::create(['name'=>$topic, 'questions_count'=>1]);
+                // 返回主题id
+                return $newTopic->id;
+            })->toArray();
+        }
+    }
+
+    * 优化 QuestionsController 控制器，实现model与控制器分离
+
+    <?php
+
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use App\Http\Requests\QuestionRequest;
+    use App\Repositories\QuestionRepository;
+    use Auth;
+
+
+    class QuestionsController extends Controller
+    {
+        protected $questionRepository;
+
+        /**
+         * QuestionsController constructor
+         */
+        public function __construct(QuestionRepository $questionRepository)
+        {   // except 表示 index、show 两个方法不受中间件影响
+            $this->middleware('auth')->except(['index','show']);
+            $this->questionRepository = $questionRepository;
+        }
+
+        /**
+         * Display a listing of the resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function index()
+        {
+            return 'index';
+        }
+
+        /**
+         * Show the form for creating a new resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function create()
+        {
+            return view('questions.make');
+        }
+
+        /**
+         * Store a newly created resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @return \Illuminate\Http\Response
+         */
+        public function store(QuestionRequest $request)
+        {
+            // 获取话题
+            $topics = $this->questionRepository
+                           ->normalizeTopic($request->get('topics'));
+
+            // 获取数据
+            $data = [
+                'title' => $request->get('title'),
+                'body' => $request->get('body'),
+                'user_id' => Auth::id()
+            ];
+
+            // 写入数据库
+            $question = $this->questionRepository->addQuestion($data);
+            // 调用topics方法 attach 方法实现多对多关联将数据写入关联表
+            $question->topics()->attach($topics);
+
+            // 返回视图
+            return redirect()->route('question.show',[$question->id]);
+        }
+
+        /**
+         * Display the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function show($id)
+        {
+            $question = $this->questionRepository->getIdWithTopics($id);
+
+            // compact 创建一个包含变量名和它们的值的数组
+            return view('questions.show',compact('question'));
+        }
+
+        /**
+         * Show the form for editing the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function edit($id)
+        {
+            //
+        }
+
+        /**
+         * Update the specified resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function update(Request $request, $id)
+        {
+            //
+        }
+
+        /**
+         * Remove the specified resource from storage.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function destroy($id)
+        {
+            //
+        }
+
+    }
+
 
     
 

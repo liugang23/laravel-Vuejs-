@@ -92,7 +92,13 @@ class QuestionsController extends Controller
      */
     public function edit($id)
     {
-        //
+        $question = $this->questionRepository->getQuestion($id);
+        // 判断操作方是否是问题的发布者
+        if (Auth::user()->owns($question)) {
+            return view('questions.edit', compact('question'));
+        }
+        // 如果不是 跳转
+        return back();
     }
 
     /**
@@ -102,9 +108,20 @@ class QuestionsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(QuestionRequest $request, $id)
     {
-        //
+        $question = $this->questionRepository->getQuestion($id);
+        // 获取话题
+        $topics = $this->questionRepository
+                       ->normalizeTopic($request->get('topics'));
+        // update 批次更新模型
+        $question->update([
+            'title' => $request->get('title'),
+            'body' => $request->get('body'),
+        ]);
+        // Sync 方法同时附加一个以上多对多关联
+        $question->topics()->sync($topics);
+        return redirect()->route('question.show', [$question->id]);
     }
 
     /**
