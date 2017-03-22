@@ -13,6 +13,6 @@ class Question extends Model
      */
     public function topics()
     {
-    	return $this->belogsToMany(Topic::class)->withTimestamps();
+    	return $this->belongsToMany(Topic::class)->withTimestamps();
     }
 }

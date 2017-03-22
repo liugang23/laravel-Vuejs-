@@ -652,6 +652,7 @@ __安装编辑插件__
         }
     }
 
+[http://select2.github.io/](http://select2.github.io/)
     // 添加 select2 到本地实现话题标签
     * 首先下载select2 相关样式文件
     * 添加select2 样式文件方法有两种
@@ -787,10 +788,6 @@ __安装编辑插件__
 
         @endsection
 
-
-
-    
-[http://select2.github.io/](http://select2.github.io/)
 
 #### 调试话题功能
     * 生成话题测试数据
@@ -946,6 +943,201 @@ __安装编辑插件__
 
     @endsection
 
+#### 实现选择话题整个流程
+    * Question.php 中添加 topics 方法，实现多对多关系
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Question extends Model
+    {
+        protected $fillable = ['title', 'body', 'user_id'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function topics()
+        {
+            return $this->belongsToMany(Topic::class)->withTimestamps();
+        }
+    }
+
+    * QuestionsController 控制器增加方法完善选择话题流程
+
+    <?php
+
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use App\Models\Question;
+    use App\Models\Topic;
+    use App\Http\Requests\QuestionRequest;
+    use Auth;
+
+
+    class QuestionsController extends Controller
+    {
+        public function __construct()
+        {   // except 表示 index、show 两个方法不受中间件影响
+            $this->middleware('auth')->except(['index','show']);
+        }
+
+        /**
+         * Display a listing of the resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function index()
+        {
+            return 'index';
+        }
+
+        /**
+         * Show the form for creating a new resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function create()
+        {
+            return view('questions.make');
+        }
+
+        /**
+         * Store a newly created resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @return \Illuminate\Http\Response
+         */
+        public function store(QuestionRequest $request)
+        {
+            // 获取话题
+            $topics = $this->normalizeTopic($request->get('topics'));
+
+            // 获取数据
+            $data = [
+                'title' => $request->get('title'),
+                'body' => $request->get('body'),
+                'user_id' => Auth::id()
+            ];
+
+            // 写入数据库
+            $question = Question::create($data);
+            // 调用topics方法 attach 方法实现多对多关联将数据写入关联表
+            $question->topics()->attach($topics);
+
+            // 返回视图
+            return redirect()->route('question.show',[$question->id]);
+        }
+
+        /**
+         * Display the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function show($id)
+        {
+            // 使用 with 方法指定想要预载入的关联对象 预载入可以大大提高程序的性能
+            // 这里的 topics 是App\Models\Question 中的 topics 方法
+            $question = Question::where('id',$id)->with('topics')->first();
+
+            // compact 创建一个包含变量名和它们的值的数组
+            return view('questions.show',compact('question'));
+        }
+
+        /**
+         * Show the form for editing the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function edit($id)
+        {
+            //
+        }
+
+        /**
+         * Update the specified resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function update(Request $request, $id)
+        {
+            //
+        }
+
+        /**
+         * Remove the specified resource from storage.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function destroy($id)
+        {
+            //
+        }
+
+        /**
+         * 获取话题
+         */
+        private function normalizeTopic(array $topics)
+        {
+            // 调用laravel自带的collect方法
+            return collect($topics)->map(function ($topic) {
+                if ( is_numeric($topic) ) {// 是否为数字
+                    // 如果存在 这里需要更新 increment用于递增
+                    // increment('votes', 5);加五
+                    Topic::find($topic)->increment('questions_count');
+                    return (int) $topic;
+                }
+
+                // 如果 $topic 不是数字 说明是用户新添加的 则在数据库中新建一个
+                $newTopic = Topic::create(['name'=>$topic, 'questions_count'=>1]);
+                // 返回主题id
+                return $newTopic->id;
+            })->toArray();
+        }
+
+    }
+
+    * resources/views/questions/show.blade.php 修改
+
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        <span style="margin-left:10px">
+                        @foreach($question->topics as $topic)
+                            <span class="topic">{{ $topic->name }}</span>
+                        @endforeach
+                        </span>
+                    </div>
+
+                    <div class="panel-body">
+                        {!! $question->body !!}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .panel-body img { width: 100%;}
+        .topic {
+            margin-right: 5px;
+            background-color: #F5F8FA;
+         };
+    </style>
+    @endsection
 
 
 

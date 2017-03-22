@@ -20,7 +20,7 @@
 							@endif
                 		</div>
                         <div class="form-group">
-                            <select class="js-example-placeholder-multiple js-data-example-ajax form-control" multiple="multiple"></select>
+                            <select name="topics[]" class="js-example-placeholder-multiple js-data-example-ajax form-control" multiple="multiple"></select>
                         </div>
                 		<div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
                 			<label for="body">描述</label>
@@ -66,12 +66,14 @@
             return "<div class='select2-result-repository clearfix'>"+
             "<div class='select2-result-repository__meta'>" +
             "<div class='select2-result-repository__title'>" +
-            topic.name ? topic.name : "Laravel" +
-            "<div></div></div>";
+            topic.name ? topic.name : topic.text +
+            "</div></div></div>";
         }
 
         function formatTopicSelection (topic) {
             // 这里的name是后端返回的  如果后端没有返回name，这里就显示用户输入的text
+            console.log(topic.text)
+            console.log(topic.name)
             return topic.name || topic.text;
         }
 
@@ -95,8 +97,8 @@
                 },
                 cache: true
             },
-            templateResult: formatTopic,// 返回样式
-            templateSelection: formatTopicSelection,// 返回样式
+            templateResult: formatTopic,// 返回话题样式
+            templateSelection: formatTopicSelection,// 返回选中话题样式
             escapeMarkup: function (markup) { return markup; }
         });
     });
