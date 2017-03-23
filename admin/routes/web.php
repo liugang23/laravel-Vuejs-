@@ -34,5 +34,7 @@ Route::resource('/','Home\QuestionsController');
 
 	Route::post('questions/{question}/answer', 'Home\AnswersController@store');
 
+	Route::get('question/{question}/follow', 'Home\FollowController@follow');
+
 // });
 

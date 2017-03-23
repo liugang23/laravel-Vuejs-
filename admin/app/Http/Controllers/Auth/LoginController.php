@@ -26,7 +26,7 @@ class LoginController extends Controller
      *
      * @var string
      */
-    protected $redirectTo = '/home';
+    protected $redirectTo = '/';
 
     /**
      * Create a new controller instance.
@@ -69,7 +69,7 @@ class LoginController extends Controller
 
     /**
      * Attempt to log the user into the application.
-     *
+     * 尝试将用户登录到应用程序
      * @param  \Illuminate\Http\Request  $request
      * @return bool
      */

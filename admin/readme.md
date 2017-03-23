@@ -2043,8 +2043,6 @@ __安装编辑插件__
     // 创建回复控制器
     php artisan make:controller Home\\AnswersController
 
-
-
     // 创建回复请求验证
     php artisan make:request AnswerRequest
 
@@ -2290,6 +2288,417 @@ __安装编辑插件__
     @endsection
 
 #### 用户关注问题
+    * 修改show 文件
+
+
+    * 创建用户-问题关系表
+    php artisan make:migration create_user_question_table --create=user_question
+
+    * 编辑 user_question 表
+    <?php
+    use Illuminate\Support\Facades\Schema;
+    use Illuminate\Database\Schema\Blueprint;
+    use Illuminate\Database\Migrations\Migration;
+
+    class CreateUserQuestionTable extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::create('user_question', function (Blueprint $table) {
+                $table->increments('id');
+                $table->integer('user_id')->unsigned()->index();
+                $table->integer('question_id')->unsigned()->index();
+                $table->timestamps();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         *
+         * @return void
+         */
+        public function down()
+        {
+            Schema::dropIfExists('user_question');
+        }
+    }
+
+    * 创建 user_question 表
+    php artisan migrate
+
+    * 创建用户关注model
+    php artisan make:model Models\\Follow
+
+    * 编辑 Follow model
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Follow extends Model
+    {
+        // 定义表
+        protected $table = 'user_question';
+
+        // 定义白名单
+        protected $fillable = ['user_id', 'question_id'];
+    }
+
+    * 修改 User model
+    <?php
+    namespace App;
+
+    use Illuminate\Notifications\Notifiable;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Naux\Mail\SendCloudTemplate;
+    use App\Models\Follow;
+    use Mail;
+    use Illuminate\Database\Eloquent\Model;
+
+    class User extends Authenticatable
+    {
+        use Notifiable;
+
+        /**
+         * The attributes that are mass assignable.
+         *
+         * @var array
+         */
+        protected $fillable = [
+            'name', 'email', 'password', 'avatar', 'confirmation_token',
+        ];
+
+        /**
+         * The attributes that should be hidden for arrays.
+         *
+         * @var array
+         */
+        protected $hidden = [
+            'password', 'remember_token',
+        ];
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany('App\Models\Answer');
+        }
+
+
+        /**
+         * 判断登录者与问题发布者是否相同
+         */
+        public function owns(Model $model)
+        {
+            return $this->id == $model->user_id;
+        }
+
+        /**
+         * 定义关注关联方法
+         */
+        public function follows($question)
+        {
+            return Follow::create([
+                'question_id' => $question,
+                'user_id' => $this->id
+            ]);
+        }
+
+
+        /**
+         * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+         */
+        public function sendPasswordResetNotification($token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+            // 选择模板
+            $template = new SendCloudTemplate('password_reset', $data);
+            // 发送邮件
+            Mail::raw($template, function ($message) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($this->email);
+            });
+
+        }
+
+    }
+
+    * 添加路由
+    Route::get('question/{question}/follow', 'FollowController@follow');
+
+    * 创建 FollowController 控制器
+    php artisan make:controller Home\\FollowController
+
+    * 编辑 FollowController 控制器
+    <?php
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use Auth;
+
+    class FollowController extends Controller
+    {
+        public function follow($question)
+        {
+            Auth::user()->follows($question);
+
+            return back();
+        }
+    }
+
+#### 优化问题关注，避免重复关注
+    * 修改 user model
+    <?php
+    namespace App;
+
+    use Illuminate\Notifications\Notifiable;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Naux\Mail\SendCloudTemplate;
+    use Mail;
+    use Illuminate\Database\Eloquent\Model;
+    use App\Models\Follow;
+
+    class User extends Authenticatable
+    {
+        use Notifiable;
+
+        /**
+         * The attributes that are mass assignable.
+         *
+         * @var array
+         */
+        protected $fillable = [
+            'name', 'email', 'password', 'avatar', 'confirmation_token',
+        ];
+
+        /**
+         * The attributes that should be hidden for arrays.
+         *
+         * @var array
+         */
+        protected $hidden = [
+            'password', 'remember_token',
+        ];
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany('App\Models\Answer');
+        }
+
+
+        /**
+         * 判断登录者与问题发布者是否相同
+         */
+        public function owns(Model $model)
+        {
+            return $this->id == $model->user_id;
+        }
+
+        /**
+         * 定义用户-问题 多对多关系
+         */
+        public function follows()
+        {
+            return $this->belongsToMany('App\Models\Question', 'user_question')->withTimestamps();
+        }
+
+        /**
+         * 执行关注操作
+         */
+        public function followThis($question)
+        {
+            // toggle 判断关系是否存在，不存在 建立，存在 删除
+            return $this->follows()->toggle($question);
+        }
+
+        /**
+         * 关注样式 选择
+         */
+        public function followed($question)
+        {
+            // !! 强制取反，返回Booleans 值
+            return !! $this->follows()->where('question_id', $question)->count();
+        }
+
+        /**
+         * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+         */
+        public function sendPasswordResetNotification($token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+            // 选择模板
+            $template = new SendCloudTemplate('password_reset', $data);
+            // 发送邮件
+            Mail::raw($template, function ($message) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($this->email);
+            });
+
+        }
+
+    }
+
+
+    * 修改 FollowController 控制器
+    <?php
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use Auth;
+
+    class FollowController extends Controller
+    {
+        public function __construct()
+        {
+            $this->middleware('auth');// 用户登录限制
+        }
+
+
+        public function follow($question)
+        {
+            Auth::user()->followThis($question);
+
+            return back();
+        }
+    }
+
+    * 修改 show 视图
+    @extends('layouts.app')
+
+    @section('content')
+    @include('vendor.ueditor.assets')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        @foreach($question->topics as $topic)
+                            <a class="topic pull-right" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-body content">
+                        {!! $question->body !!}
+                    </div>
+                    <div class="edit-actions">
+                        @if(Auth::check() && Auth::user()->owns($question))
+                            <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                            <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                                {{ method_field('DELETE') }}
+                                {{ csrf_field() }}
+                                <button class="button is-naked delete-button">删 除</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>{{ $question->followers_count }}</h2>
+                        <span>关注者</span>
+                    </div>
+                    <div class="panel-body">
+                        <a href="/question/{{$question->id}}/follow" class="btn btn-default {{ Auth::user()->followed($question->id) ? 'btn-success' : "" }}">
+                            {{ Auth::user()->followed($question->id) ? '已关注' : '关注该问题' }}
+                        </a>
+                        <a href="#editor" class="btn btn-primary">撰写答案</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->answers_count }}个回复
+                    </div>
+
+                    <div class="panel-body">
+                        @foreach($question->answers as $answer)
+                            <div class="media">
+                                <div class="media-left">
+                                    <a href="">
+                                        <img class="top-margin" width="36" src="{{ $answer->user->avatar }}" alt="{{ $answer->user->name }}">
+                                    </a>
+                                </div>
+                                <div class="media-body">
+                                    <h4 class="media-heading top-margin">
+                                        <a href="/user/{{ $answer->user->name }}">
+                                            {{ $answer->user->name }}
+                                        </a>
+                                    </h4>
+                                    {!! $answer->body !!}
+                                </div>
+                            </div>
+                        @endforeach
+                        @if(Auth::check())
+                        <form action="/questions/{{$question->id}}/answer" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:120px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">提交回复</button>
+                        </form>
+                        @else
+                        <a href="{{ url('login') }}" class="btn btn-success btn-block">登录提交答案</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+    </script>
+    @endsection
+
+    @endsection
+
+#### 使用Vuejs 组件化开发
+    * 下载 vue-axios
+    npm install vue-axios --save
+
+    * 定义 Vue button 组件
+
 
 
 
