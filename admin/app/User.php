@@ -31,6 +31,15 @@ class User extends Authenticatable
     ];
 
     /**
+     * 定义回复
+     */
+    public function answers()
+    {
+        return $this->hasMany('App\Models\Answer');
+    }
+
+
+    /**
      * 判断登录者与问题发布者是否相同
      */
     public function owns(Model $model)

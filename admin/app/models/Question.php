@@ -26,6 +26,14 @@ class Question extends Model
     }
 
     /**
+     * 定义回复
+     */
+    public function answers()
+    {
+        return $this->hasMany(Answer::class);
+    }
+
+    /**
      * scope 前缀的模型方法
      * 范围查询可以让您轻松的重复利用模型的查询逻辑。要设定范围查询，只要定义有  scope 前缀的模型方法：
      */

@@ -1562,8 +1562,739 @@ __安装编辑插件__
 
 #### 问题Feed和删除问题
 
+    * 增加 questions 的 index.blade.php
+    @extends('layouts.app')
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                @foreach($questions as $question)
+                    <div class="media">
+                        <div class="media-left">
+                            <a href="">
+                                <img width="48" src="{{ $question->user->avatar }}" alt="{{ $question->user->name }}">
+                            </a>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="media-heading top-margin">
+                                <a href="/questions/{{ $question->id }}">
+                                    {{ $question->title }}
+                                </a>
+                            </h4>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endsection
 
-    
+    * 编辑 questions 控制器
+    <?php
+
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use App\Http\Requests\QuestionRequest;
+    use App\Repositories\QuestionRepository;
+    use Auth;
+
+
+    class QuestionsController extends Controller
+    {
+        protected $questionRepository;
+
+        /**
+         * QuestionsController constructor
+         */
+        public function __construct(QuestionRepository $questionRepository)
+        {   // except 表示 index、show 两个方法不受中间件影响
+            $this->middleware('auth')->except(['index','show']);
+            $this->questionRepository = $questionRepository;
+        }
+
+        /**
+         * Display a listing of the resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function index()
+        {
+            $questions = $this->questionRepository->getQuestionsFeed();
+            return view('questions.index', compact('questions'));
+        }
+
+        /**
+         * Show the form for creating a new resource.
+         *
+         * @return \Illuminate\Http\Response
+         */
+        public function create()
+        {
+            return view('questions.make');
+        }
+
+        /**
+         * Store a newly created resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @return \Illuminate\Http\Response
+         */
+        public function store(QuestionRequest $request)
+        {
+            // 获取话题
+            $topics = $this->questionRepository
+                           ->normalizeTopic($request->get('topics'));
+
+            // 获取数据
+            $data = [
+                'title' => $request->get('title'),
+                'body' => $request->get('body'),
+                'user_id' => Auth::id()
+            ];
+
+            // 写入数据库
+            $question = $this->questionRepository->addQuestion($data);
+            // 调用topics方法 attach 方法实现多对多关联将数据写入关联表
+            $question->topics()->attach($topics);
+
+            // 返回视图
+            return redirect()->route('question.show',[$question->id]);
+        }
+
+        /**
+         * Display the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function show($id)
+        {
+            $question = $this->questionRepository->getIdWithTopics($id);
+
+            // compact 创建一个包含变量名和它们的值的数组
+            return view('questions.show',compact('question'));
+        }
+
+        /**
+         * Show the form for editing the specified resource.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function edit($id)
+        {
+            $question = $this->questionRepository->getQuestion($id);
+            // 判断操作方是否是问题的发布者
+            if (Auth::user()->owns($question)) {
+                return view('questions.edit', compact('question'));
+            }
+            // 如果不是 跳转
+            return back();
+        }
+
+        /**
+         * Update the specified resource in storage.
+         *
+         * @param  \Illuminate\Http\Request  $request
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function update(QuestionRequest $request, $id)
+        {
+            $question = $this->questionRepository->getQuestion($id);
+            // 获取话题
+            $topics = $this->questionRepository
+                           ->normalizeTopic($request->get('topics'));
+            // update 批次更新模型
+            $question->update([
+                'title' => $request->get('title'),
+                'body' => $request->get('body'),
+            ]);
+            // Sync 方法同时附加一个以上多对多关联
+            $question->topics()->sync($topics);
+            return redirect()->route('question.show', [$question->id]);
+        }
+
+        /**
+         * Remove the specified resource from storage.
+         *
+         * @param  int  $id
+         * @return \Illuminate\Http\Response
+         */
+        public function destroy($id)
+        {
+            $question = $this->questionRepository->getQuestion($id);
+            // 判断操作是否是本人
+            if (Auth::user()->owns($question)) {
+                $question->delete();
+                return redirect('/');
+            }
+            abort(403, 'Forbidden');// return back();
+        }
+
+
+    }
+
+    * 在 Question.php 中定义 user 和 scopePublished 方法
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Question extends Model
+    {
+        protected $fillable = ['title', 'body', 'user_id'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function topics()
+        {
+            return $this->belongsToMany(Topic::class)->withTimestamps();
+        }
+
+        /**
+         * 定义相对的关联
+         * Eloquent 默认会使用 Question 数据库表的 user_id 字段查询关联。如果想要自己指定外键字段，可以在 belongsTo 方法里传入第二个参数
+         */
+        public function user()
+        {
+            return $this->belongsTo('App\User');
+        }
+
+        /**
+         * scope 前缀的模型方法
+         * 范围查询可以让您轻松的重复利用模型的查询逻辑。要设定范围查询，只要定义有  scope 前缀的模型方法：
+         */
+        public function scopePublished($query)
+        {
+            // 返回允许发布的内容
+            return $query->where('is_hidden', 'F');
+        }
+
+    }
+
+    * 在 Repositories/QuestionRepository.php 中添加 getQuestionsFeed 方法
+
+    <?php
+    namespace App\Repositories;
+
+    use App\Models\Question;
+    use App\Models\Topic;
+
+    class QuestionRepository
+    {
+        /**
+         * 获取话题
+         * @param $id
+         * @return mixed
+         */
+        public function getIdWithTopics($id)
+        {
+            // 使用 with 方法指定想要预载入的关联对象 预载入可以大大提高程序的性能
+            // 这里的 topics 是App\Models\Question 中的 topics 方法
+            return Question::where('id',$id)->with('topics')->first();
+        }
+
+        /**
+         * 添加问题
+         */
+        public function addQuestion(array $attributes)
+        {
+            return Question::create($attributes);
+        }
+
+        /**
+         * 获取指定问题
+         */
+        public function getQuestion($id)
+        {
+            return Question::find($id);   
+        }
+
+        /**
+         * 获取全部问题
+         */
+        public function getQuestionsFeed()
+        {   // 返回指定范围数据 并关联相应的发布者
+            // latest 在 vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:1163
+            // latest 按时间戳排序
+            // wiht 预加载
+            return Question::published()
+                   ->latest('updated_at')->with('user')->get();
+        }
+
+        /**
+         * 查询话题
+         */
+        public function normalizeTopic(array $topics)
+        {
+            // 调用laravel自带的collect方法
+            return collect($topics)->map(function ($topic) {
+                if ( is_numeric($topic) ) {// 是否为数字
+                    // 如果存在 这里需要更新 increment用于递增
+                    // increment('votes', 5);加五
+                    Topic::find($topic)->increment('questions_count');
+                    return (int) $topic;
+                }
+
+                // 如果 $topic 不是数字 说明是用户新添加的 则在数据库中新建一个
+                $newTopic = Topic::create(['name'=>$topic, 'questions_count'=>1]);
+                // 返回主题id
+                return $newTopic->id;
+            })->toArray();
+        }
+    }
+
+#### 实现提交问题的 Answer(回答)
+    * 创建 Answer model和表
+    php artisan make:model Answer -m
+
+    * 编辑 Answer 数据库表
+    <?php
+
+    use Illuminate\Support\Facades\Schema;
+    use Illuminate\Database\Schema\Blueprint;
+    use Illuminate\Database\Migrations\Migration;
+
+    class CreateAnswersTable extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::create('answers', function (Blueprint $table) {
+                $table->increments('id');
+                // 记录回复者的用户id
+                $table->integer('user_id')->index()->unsigned();
+                // 回复与问题对应
+                $table->integer('question_id')->index()->unsigned();
+                // 回复的内容
+                $table->text('body');
+                // 点赞统计
+                $table->integer('votes_count')->default(0);
+                // 评论统计
+                $table->integer('comments_count')->default(0); 
+                // 是否发布   
+                $table->string('is_hidden', 8)->default('F');
+                // 是否关闭评论
+                $table->string('close_comment', 8)->default('F');  
+                $table->timestamps();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         *
+         * @return void
+         */
+        public function down()
+        {
+            Schema::dropIfExists('answers');
+        }
+    }
+
+    * 编辑 Answer model
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Answer extends Model
+    {
+        protected $fillable = ['user_id', 'question_id', 'body'];
+
+        /* 定义一对多 */
+        public function user()
+        {
+            return $this->belongsTo('App\User');
+        }
+
+        /*  */
+        public function question()
+        {
+            return $this->belongsTo(Question::class);
+        }
+    }
+
+    * 编辑 Question model
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Question extends Model
+    {
+        protected $fillable = ['title', 'body', 'user_id'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function topics()
+        {
+            return $this->belongsToMany(Topic::class)->withTimestamps();
+        }
+
+        /**
+         * 定义相对的关联
+         * Eloquent 默认会使用 Question 数据库表的 user_id 字段查询关联。如果想要自己指定外键字段，可以在 belongsTo 方法里传入第二个参数
+         */
+        public function user()
+        {
+            return $this->belongsTo('App\User');
+        }
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany(Answer::class);
+        }
+
+        /**
+         * scope 前缀的模型方法
+         * 范围查询可以让您轻松的重复利用模型的查询逻辑。要设定范围查询，只要定义有  scope 前缀的模型方法：
+         */
+        public function scopePublished($query)
+        {
+            // 返回允许发布的内容
+            return $query->where('is_hidden', 'F');
+        }
+
+    }
+
+    * 编辑 User model
+    <?php
+    namespace App;
+
+    use Illuminate\Notifications\Notifiable;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Naux\Mail\SendCloudTemplate;
+    use Mail;
+    use Illuminate\Database\Eloquent\Model;
+
+    class User extends Authenticatable
+    {
+        use Notifiable;
+
+        /**
+         * The attributes that are mass assignable.
+         *
+         * @var array
+         */
+        protected $fillable = [
+            'name', 'email', 'password', 'avatar', 'confirmation_token',
+        ];
+
+        /**
+         * The attributes that should be hidden for arrays.
+         *
+         * @var array
+         */
+        protected $hidden = [
+            'password', 'remember_token',
+        ];
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany('App\Models\Answer');
+        }
+
+
+        /**
+         * 判断登录者与问题发布者是否相同
+         */
+        public function owns(Model $model)
+        {
+            return $this->id == $model->user_id;
+        }
+
+
+        /**
+         * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+         */
+        public function sendPasswordResetNotification($token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+            // 选择模板
+            $template = new SendCloudTemplate('password_reset', $data);
+            // 发送邮件
+            Mail::raw($template, function ($message) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($this->email);
+            });
+
+        }
+
+    }
+
+    * 实现提交问题回复
+    // 创建回复控制器
+    php artisan make:controller Home\\AnswersController
+
+
+
+    // 创建回复请求验证
+    php artisan make:request AnswerRequest
+
+    // 创建提交 Answers 路由
+    Route::post('questions/{question}/answer', 'Home\AnswersController@store');
+
+    // 编辑 Answer model
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Answer extends Model
+    {
+        protected $fillable = ['user_id', 'question_id', 'body'];
+
+        /* 定义一对多 */
+        public function user()
+        {
+            return $this->belongsTo('App\User');
+        }
+
+        /*  */
+        public function question()
+        {
+            return $this->belongsTo(Question::class);
+        }
+    }
+
+    // 修改 Question model
+    <?php
+    namespace App\Models;
+
+    use Illuminate\Database\Eloquent\Model;
+
+    class Question extends Model
+    {
+        protected $fillable = ['title', 'body', 'user_id'];
+
+        /**
+         * 定义多对多关系
+         */
+        public function topics()
+        {
+            return $this->belongsToMany(Topic::class)->withTimestamps();
+        }
+
+        /**
+         * 定义相对的关联
+         * Eloquent 默认会使用 Question 数据库表的 user_id 字段查询关联。如果想要自己指定外键字段，可以在 belongsTo 方法里传入第二个参数
+         */
+        public function user()
+        {
+            return $this->belongsTo('App\User');
+        }
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany(Answer::class);
+        }
+
+        /**
+         * scope 前缀的模型方法
+         * 范围查询可以让您轻松的重复利用模型的查询逻辑。要设定范围查询，只要定义有  scope 前缀的模型方法：
+         */
+        public function scopePublished($query)
+        {
+            // 返回允许发布的内容
+            return $query->where('is_hidden', 'F');
+        }
+
+    }
+
+    // 修改 User model
+    <?php
+    namespace App;
+
+    use Illuminate\Notifications\Notifiable;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Naux\Mail\SendCloudTemplate;
+    use Mail;
+    use Illuminate\Database\Eloquent\Model;
+
+    class User extends Authenticatable
+    {
+        use Notifiable;
+
+        /**
+         * The attributes that are mass assignable.
+         *
+         * @var array
+         */
+        protected $fillable = [
+            'name', 'email', 'password', 'avatar', 'confirmation_token',
+        ];
+
+        /**
+         * The attributes that should be hidden for arrays.
+         *
+         * @var array
+         */
+        protected $hidden = [
+            'password', 'remember_token',
+        ];
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany('App\Models\Answer');
+        }
+
+
+        /**
+         * 判断登录者与问题发布者是否相同
+         */
+        public function owns(Model $model)
+        {
+            return $this->id == $model->user_id;
+        }
+
+
+        /**
+         * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+         */
+        public function sendPasswordResetNotification($token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+            // 选择模板
+            $template = new SendCloudTemplate('password_reset', $data);
+            // 发送邮件
+            Mail::raw($template, function ($message) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($this->email);
+            });
+
+        }
+
+    }
+
+    // 修改 show 视图
+    @extends('layouts.app')
+
+    @section('content')
+    @include('vendor.ueditor.assets')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        @foreach($question->topics as $topic)
+                            <a class="topic pull-right" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-body content">
+                        {!! $question->body !!}
+                    </div>
+                    <div class="edit-actions">
+                        @if(Auth::check() && Auth::user()->owns($question))
+                            <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                            <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                                {{ method_field('DELETE') }}
+                                {{ csrf_field() }}
+                                <button class="button is-naked delete-button">删 除</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->answers_count }}个回复
+                    </div>
+
+                    <div class="panel-body">
+                        @foreach($question->answers as $answer)
+                            <div class="media">
+                                <div class="media-left">
+                                    <a href="">
+                                        <img class="top-margin" width="36" src="{{ $answer->user->avatar }}" alt="{{ $answer->user->name }}">
+                                    </a>
+                                </div>
+                                <div class="media-body">
+                                    <h4 class="media-heading top-margin">
+                                        <a href="/user/{{ $answer->user->name }}">
+                                            {{ $answer->user->name }}
+                                        </a>
+                                    </h4>
+                                    {!! $answer->body !!}
+                                </div>
+                            </div>
+                        @endforeach
+                        <form action="/questions/{{$question->id}}/answer" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:120px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">提交回复</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+    </script>
+    @endsection
+
+    @endsection
+
+#### 用户关注问题
+
+
+
+
+
 
 
 

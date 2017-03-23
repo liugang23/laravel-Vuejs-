@@ -79,7 +79,8 @@ class QuestionsController extends Controller
      */
     public function show($id)
     {
-        $question = $this->questionRepository->getIdWithTopics($id);
+        $question = $this->questionRepository
+                         ->getIdWithTopicsAndAnswers($id);
 
         // compact 创建一个包含变量名和它们的值的数组
         return view('questions.show',compact('question'));

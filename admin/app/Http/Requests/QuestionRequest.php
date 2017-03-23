@@ -13,7 +13,7 @@ class QuestionRequest extends FormRequest
      */
     public function authorize()
     {
-        // true 允许每个都可以发布问题
+        // true 允许每个人都可以发布问题
         return true;
     }
 

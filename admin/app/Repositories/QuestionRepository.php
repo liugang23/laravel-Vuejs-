@@ -12,11 +12,11 @@ class QuestionRepository
      * @param $id
      * @return mixed
      */
-	public function getIdWithTopics($id)
+	public function getIdWithTopicsAndAnswers($id)
 	{
         // 使用 with 方法指定想要预载入的关联对象 预载入可以大大提高程序的性能
         // 这里的 topics 是App\Models\Question 中的 topics 方法
-        return Question::where('id',$id)->with('topics')->first();
+        return Question::where('id',$id)->with('topics', 'answers')->first();
 	}
 
 	/**

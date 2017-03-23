@@ -32,5 +32,7 @@ Route::resource('/','Home\QuestionsController');
 		'show' => 'question.show',
 	]]);
 
+	Route::post('questions/{question}/answer', 'Home\AnswersController@store');
+
 // });
 
