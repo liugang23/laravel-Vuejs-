@@ -16,6 +16,7 @@
     <!-- <link href="/css/common.css" rel="stylesheet"> -->
     <link href="/css/base.css" rel="stylesheet">
 
+
     <!-- Scripts -->
     <script>
         window.Laravel = <?php echo json_encode([
@@ -24,6 +25,7 @@
     </script>
 </head>
 <body>
+    @include('vendor.ueditor.assets')
     <div id="app">
         <nav class="navbar navbar-default navbar-static-top">
             <div class="container">

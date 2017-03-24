@@ -2469,6 +2469,15 @@ __安装编辑插件__
         }
     }
 
+#### 使用vue 实现关注按钮组件化
+    * resources/assets/js/components 编辑组件 QuestionFollowButton.vue
+
+
+
+    * 定义路由
+
+
+    
 
 
 
