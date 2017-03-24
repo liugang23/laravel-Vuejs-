@@ -2043,8 +2043,6 @@ __安装编辑插件__
     // 创建回复控制器
     php artisan make:controller Home\\AnswersController
 
-
-
     // 创建回复请求验证
     php artisan make:request AnswerRequest
 
