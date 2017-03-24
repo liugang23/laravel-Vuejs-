@@ -36,7 +36,9 @@
                 </div>
                 <div class="panel-body">
                 @if(Auth::check())
-                    <a href="/question/{{$question->id}}/follow" class="btn btn-default {{ Auth::user()->followed($question->id) ? 'btn-success' : '' }}">{{ Auth::user()->followed($question->id) ? '已关注' : '关注该问题' }}</a>
+                    <a href="/question/{{$question->id}}/follow" class="btn btn-default {{ Auth::user()->followed($question->id) ? 'btn-success' : "" }}">
+                        {{ Auth::user()->followed($question->id) ? '已关注' : '关注该问题' }}
+                    </a>
                 @else
                     <a href="{{ url('login') }}" class="btn btn-default">关注问题</a>
                 @endif

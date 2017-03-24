@@ -9,7 +9,7 @@ class RedirectIfAuthenticated
 {
     /**
      * Handle an incoming request.
-     *
+     * 处理传入的请求
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure  $next
      * @param  string|null  $guard

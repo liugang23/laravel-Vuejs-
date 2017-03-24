@@ -2285,13 +2285,13 @@ __安装编辑插件__
 
     @endsection
 
+<<<<<<< HEAD
 #### 实现用户关注问题
-    * 创建 user-question 关系表
+    * 创建用户-问题关系表
     php artisan make:migration create_user_question_table --create=user_question
 
-    * 编辑 user-question 表
+    * 编辑 user_question 表
     <?php
-
     use Illuminate\Support\Facades\Schema;
     use Illuminate\Database\Schema\Blueprint;
     use Illuminate\Database\Migrations\Migration;
@@ -2343,16 +2343,16 @@ __安装编辑插件__
         protected $fillable = ['user_id', 'question_id'];
     }
 
-    * User model 中添加方法
+    * 修改 User model
     <?php
     namespace App;
 
     use Illuminate\Notifications\Notifiable;
     use Illuminate\Foundation\Auth\User as Authenticatable;
     use Naux\Mail\SendCloudTemplate;
+    use App\Models\Follow;
     use Mail;
     use Illuminate\Database\Eloquent\Model;
-    use App\Models\Follow;
 
     class User extends Authenticatable
     {
@@ -2384,6 +2384,7 @@ __安装编辑插件__
             return $this->hasMany('App\Models\Answer');
         }
 
+
         /**
          * 判断登录者与问题发布者是否相同
          */
@@ -2393,31 +2394,16 @@ __安装编辑插件__
         }
 
         /**
-         * 定义多对多关系
+         * 定义关注关联方法
          */
-        public function follows()
+        public function follows($question)
         {
-            return $this->belongsToMany('App\Models\Question', 'user_question')->withTimestamps();
+            return Follow::create([
+                'question_id' => $question,
+                'user_id' => $this->id
+            ]);
         }
 
-        /**
-         * 关注操作
-         */
-        public function followThis($question)
-        {
-            // toggle 方法实现关系存在  删除，否则反之
-            // toggle 一般用在多对多
-            return $this->follows()->toggle($question);
-        }
-
-        /**
-         * 关注样式选择
-         */
-        public function followed($question)
-        {
-            // !! 强制取反，返回bool值
-            return $this->follows()->where('question_id', $question)->count();
-        }
 
         /**
          * laravel 不支持sendCloud 模板 重写重置密码邮件发送
@@ -2440,12 +2426,12 @@ __安装编辑插件__
     }
 
     * 添加路由
-    Route::get('question/{question}/follow', 'Home\FollowController@follw');
+    Route::get('question/{question}/follow', 'FollowController@follow');
 
-    * 创建控制器
+    * 创建 FollowController 控制器
     php artisan make:controller Home\\FollowController
 
-    * 定义 FollowController 控制器方法
+    * 编辑 FollowController 控制器
     <?php
     namespace App\Http\Controllers\Home;
 
@@ -2460,14 +2446,15 @@ __安装编辑插件__
             // 登录限制
             $this->middleware('auth');
         }
-    
+
         public function follow($question)
         {
-            Auth::user()->followThis($question);
+            Auth::user()->follows($question);
 
             return back();
         }
     }
+
 
 
 
