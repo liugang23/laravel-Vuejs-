@@ -2,8 +2,8 @@
     <button 
         class="btn btn-default"
         v-bind:class="{ 'btn-success': followed }"
-        v-text="text"
         v-on:click="follow"
+        v-text="text"
     ></button>
 </template>
 
@@ -13,7 +13,7 @@
         mounted() {
             this.$http.post('/api/question/follower',{'question':this.question, 'user':this.user})
             .then(response=>{
-                console.log(response.data);
+                this.followed = response.data.followed
             })
         },
         data() {
@@ -28,10 +28,8 @@
         },
         methods: {
             follow() {
-                console.log(this.user)
                 this.$http.post('/api/question/follow', {'question': this.question, 'user': this.user})
                 .then(response=>{
-                    
                     this.followed = response.data.followed
                 })
             }

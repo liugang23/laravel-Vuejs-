@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Home;
 
 use Illuminate\Http\Request;
@@ -9,15 +8,15 @@ use Auth;
 class FollowController extends Controller
 {
 	public function __construct()
-	{
-		// 登录限制
-		$this->middleware('auth');
-	}
+    {
+        // 登录限制
+        $this->middleware('auth');
+    }
 
     public function follow($question)
     {
-    	Auth::user()->followThis($question);
+        Auth::user()->follows($question);
 
-    	return back();
+        return back();
     }
 }

@@ -24,6 +24,7 @@ Route::get('/topics', function (Request $request) {
     return $topics;
 })->middleware('api');
 
+
 // 关注组件 勾子调用
 Route::post('/question/follower', function (Request $request) {
 	$followed = \App\Models\Follow::where('question_id', $request->get('question'))
@@ -42,7 +43,7 @@ Route::post('/question/follow', function (Request $request) {
 	$followed = \App\Models\Follow::where('question_id', $request->get('question'))
 		->where('user_id', $request->get('user'))
 		->first();
-		
+
 	// 对查询结果进行判断  非空 删除记录 改变状态
 	if($followed !== null) {
 		$followed->delete();

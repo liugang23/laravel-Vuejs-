@@ -1,5 +1,4 @@
 <?php
-
 namespace App;
 
 use Illuminate\Notifications\Notifiable;
@@ -50,6 +49,7 @@ class User extends Authenticatable
 
     /**
      * 定义多对多关系
+     * 定义用户-问题 多对多关系
      */
     public function follows()
     {

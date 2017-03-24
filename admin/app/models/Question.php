@@ -34,7 +34,11 @@ class Question extends Model
     }
 
     /**
+<<<<<<< HEAD
      * 定义多对多关系
+=======
+     * 定义用户-问题 关注多对多关系 
+>>>>>>> 3a409d1fa3fe5da1c0a1d51a213d465604c2a349
      */
     public function followers()
     {
