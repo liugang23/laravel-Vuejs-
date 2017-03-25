@@ -66,15 +66,15 @@
                             </div>
                             <div class="statics-item text-center">
                                 <div class="statics-text">回答</div>
-                                <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                <div class="statics-count">{{ $question->user->answers_count }}</div>
                             </div>
                             <div class="statics-item text-center">
                                 <div class="statics-text">关注</div>
-                                <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                <div class="statics-count">{{ $question->user->followers_count }}</div>
                             </div>
                         </div>
                     </div>
-                    <question-follow-button question="{{$question->id}}"></question-follow-button>
+                    <user-follow-button user="{{$question->user_id}}"></user-follow-button>
                     <a href="#editor" class="btn btn-default pull-right">发送私信</a>
                 </div>
             </div>

@@ -76,13 +76,32 @@ class User extends Authenticatable
     }
 
     /**
-     * 用户 关注 用户
+     * 关注 被关注用户
      */
     public function followers()
     {
         // 因为是用户关注用户 self::class(自己调用自己)
         return $this->belongsToMany(self::class, 'followers', 'follower_id', 'followed_id')->withTimestamps();
     }
+
+    /**
+     * 被关注用户 关注
+     */
+    public function followersUser()
+    {
+        // 因为是用户关注用户 self::class(自己调用自己)
+        return $this->belongsToMany(self::class, 'followers', 'followed_id', 'follower_id')->withTimestamps();
+    }
+
+    /**
+     * 关注\取消关注 用户
+     */
+    public function followThisUser($user)
+    {
+        // 调用多对多查询 toggle对查询结果 取反操作
+        return $this->followers()->toggle($user);
+    }
+
 
     /**
      * laravel 不支持sendCloud 模板 重写重置密码邮件发送
