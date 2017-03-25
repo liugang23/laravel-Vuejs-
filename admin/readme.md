@@ -2778,8 +2778,313 @@ __安装编辑插件__
 
     @endsection
 
+#### 关注用户 
+    * 创建用户与用户关注关系表
+    php artisan make:migration create_followers_table --create=followers
+
+    * 编辑 followers 表
+    <?php
+    use Illuminate\Support\Facades\Schema;
+    use Illuminate\Database\Schema\Blueprint;
+    use Illuminate\Database\Migrations\Migration;
+
+    class CreateFollowersTable extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::create('followers', function (Blueprint $table) {
+                $table->increments('id');
+                // 关注用户
+                $table->integer('follower_id')->unsigned()->index();
+                // 被关注用户
+                $table->integer('followed_id')->unsigned()->index();
+                $table->timestamps();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         *
+         * @return void
+         */
+        public function down()
+        {
+            Schema::dropIfExists('followers');
+        }
+    }
+
+    * 创建 followers 关系表
+    php artisan migrate
+
+    * User model中添加 followers 方法
+    <?php
+    namespace App;
+
+    use Illuminate\Notifications\Notifiable;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+    use Naux\Mail\SendCloudTemplate;
+    use Mail;
+    use Illuminate\Database\Eloquent\Model;
+    use App\Models\Follow;
+
+    class User extends Authenticatable
+    {
+        use Notifiable;
+
+        /**
+         * The attributes that are mass assignable.
+         *
+         * @var array
+         */
+        protected $fillable = [
+            'name', 'email', 'password', 'avatar', 'confirmation_token', 'api_token'
+        ];
+
+        /**
+         * The attributes that should be hidden for arrays.
+         *
+         * @var array
+         */
+        protected $hidden = [
+            'password', 'remember_token',
+        ];
+
+        /**
+         * 定义回复
+         */
+        public function answers()
+        {
+            return $this->hasMany('App\Models\Answer');
+        }
 
 
+        /**
+         * 判断登录者与问题发布者是否相同
+         */
+        public function owns(Model $model)
+        {
+            return $this->id == $model->user_id;
+        }
+
+        /**
+         * 定义多对多关系
+         * 定义用户-问题 多对多关系
+         */
+        public function follows()
+        {
+            return $this->belongsToMany('App\Models\Question', 'user_question')->withTimestamps();
+        }
+
+        /**
+         * 关注操作
+         */
+        public function followThis($question)
+        {
+            // toggle 方法实现关系存在  删除，否则反之
+            // toggle 一般用在多对多
+            return $this->follows()->toggle($question);
+        }
+
+        /**
+         * 关注样式选择
+         */
+        public function followed($question)
+        {
+            // !! 强制取反，返回bool值
+            return $this->follows()->where('question_id', $question)->count();
+        }
+
+        /**
+         * 用户 关注 用户
+         */
+        public function followers()
+        {
+            // 因为是用户关注用户 self::class(自己调用自己)
+            return $this->belongsToMany(self::class, 'followers', 'follower_id', 'followed_id')->withTimestamps();
+        }
+
+        /**
+         * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+         */
+        public function sendPasswordResetNotification($token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+            // 选择模板
+            $template = new SendCloudTemplate('password_reset', $data);
+            // 发送邮件
+            Mail::raw($template, function ($message) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($this->email);
+            });
+
+        }
+
+    }
+
+
+    * 修改 show 视图文件
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        @foreach($question->topics as $topic)
+                            <a class="topic pull-right" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-body content">
+                        {!! $question->body !!}
+                    </div>
+                    <div class="edit-actions">
+                        @if(Auth::check() && Auth::user()->owns($question))
+                            <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                            <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                                {{ method_field('DELETE') }}
+                                {{ csrf_field() }}
+                                <button class="button is-naked delete-button">删 除</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 pull-right">
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>{{ $question->followers_count }}</h2>
+                        <span>关注者</span>
+                    </div>
+                    <div class="panel-body">
+                    @if(Auth::check())
+                        <question-follow-button question="{{$question->id}}"></question-follow-button>
+                        <a href="#editor" class="btn btn-primary pull-right">撰写答案</a>
+                    @else
+                        <a href="{{url('login')}}" class="btn btn-default">关注该问题</a>
+                        <a href="{{url('login')}}" class="btn btn-primary pull-right">撰写答案</a>
+                    @endif
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>关于作者</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-body">
+                            <div class="media-left">
+                                <a href="#">
+                                    <img width="36" src="{{$question->user->avatar}}" alt="{{$question->user->name}}">
+                                </a>
+                            </div>
+                            <div class="media-body">
+                                <h4 class="media-heading">
+                                    <a href="">{{ $question->user->name }}</a>
+                                </h4>
+                            </div>
+                            <div class="user-statics">
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">问题</div>
+                                    <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                </div>
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">回答</div>
+                                    <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                </div>
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">关注</div>
+                                    <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <question-follow-button question="{{$question->id}}"></question-follow-button>
+                        <a href="#editor" class="btn btn-default pull-right">发送私信</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->answers_count }}个回复
+                    </div>
+
+                    <div class="panel-body">
+                        @foreach($question->answers as $answer)
+                            <div class="media">
+                                <div class="media-left">
+                                    <a href="">
+                                        <img class="top-margin" width="36" src="{{ $answer->user->avatar }}" alt="{{ $answer->user->name }}">
+                                    </a>
+                                </div>
+                                <div class="media-body">
+                                    <h4 class="media-heading top-margin">
+                                        <a href="/user/{{ $answer->user->name }}">
+                                            {{ $answer->user->name }}
+                                        </a>
+                                    </h4>
+                                    {!! $answer->body !!}
+                                </div>
+                            </div>
+                        @endforeach
+                        @if(Auth::check())
+                        <form action="/questions/{{$question->id}}/answer" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:120px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">提交回复</button>
+                        </form>
+                        @else
+                        <a href="{{ url('login') }}" class="btn btn-success btn-block">登录提交答案</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+    </script>
+    @endsection
+
+    @endsection
+
+
+#### 用户关注组件化
 
 
 

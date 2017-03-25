@@ -34,3 +34,9 @@ a.topic:hover {
 }
 .top-margin { margin-top: 10px;}
 .question-follow { text-align: center; }
+.user-statics, .user-actions { margin-top: 20px; }
+.user-statics { display: flex; }
+.statics-item { padding: 2px 18px; }
+.statics-text { text-align: center; }
+
+

@@ -76,6 +76,15 @@ class User extends Authenticatable
     }
 
     /**
+     * 用户 关注 用户
+     */
+    public function followers()
+    {
+        // 因为是用户关注用户 self::class(自己调用自己)
+        return $this->belongsToMany(self::class, 'followers', 'follower_id', 'followed_id')->withTimestamps();
+    }
+
+    /**
      * laravel 不支持sendCloud 模板 重写重置密码邮件发送
      */
     public function sendPasswordResetNotification($token)
