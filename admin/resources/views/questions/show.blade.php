@@ -34,8 +34,13 @@
                     <span>关注者</span>
                 </div>
                 <div class="panel-body">
-                    <question-follow-button question="{{$question->id}}" user="{{Auth::id()}}"></question-follow-button>
+                @if(Auth::check())
+                    <question-follow-button question="{{$question->id}}"></question-follow-button>
                     <a href="#editor" class="btn btn-primary">撰写答案</a>
+                @else
+                    <a href="{{url('login')}}" class="btn btn-default">关注该问题</a>
+                    <a href="{{url('login')}}" class="btn btn-primary">撰写答案</a>
+                @endif
                 </div>
             </div>
         </div>

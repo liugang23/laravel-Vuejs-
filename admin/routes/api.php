@@ -27,34 +27,32 @@ Route::get('/topics', function (Request $request) {
 
 // 关注组件 勾子调用
 Route::post('/question/follower', function (Request $request) {
-	$followed = \App\Models\Follow::where('question_id', $request->get('question'))
-		->where('user_id', $request->get('user'))
-		->count();
+	$user = Auth::guard('api')->user();
+	$followed = $user->followed($request->get('question'));
 
 	if($followed) {
 		return response()->json(['followed' => true]);
 	}
 	return response()->json(['followed' => false]);
 	
-})->middleware('api');
+})->middleware('auth:api');
 
 // 关注 点击响应
 Route::post('/question/follow', function (Request $request) {
-	$followed = \App\Models\Follow::where('question_id', $request->get('question'))
-		->where('user_id', $request->get('user'))
-		->first();
+	$user = Auth::guard('api')->user();
+	$question = \App\Models\Question::find($request->get('question'));
+	$followed = $user->followThis($question->id);
 
+	// $followed 返回两数组结果集 detached attached
 	// 对查询结果进行判断  非空 删除记录 改变状态
-	if($followed !== null) {
-		$followed->delete();
+	if(count($followed['detached']) > 0) {
+        $question->decrement('followers_count');
 		return response()->json(['followed' => false]);
 	}
+
 	// 否则 创建记录
-	\App\Models\Follow::create([
-		'question_id' => $request->get('question'),
-		'user_id' => $request->get('user'),
-	]);
+	$question->increment('followers_count');
 	// 返回状态
 	return response()->json(['followed' => true]);
 
-})->middleware('api');
+})->middleware('auth:api');

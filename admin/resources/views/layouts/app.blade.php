@@ -13,15 +13,16 @@
     <!-- Styles -->
     <link href="/css/app.css" rel="stylesheet">
     <link href="/css/select2.min.css" rel="stylesheet">
-    <!-- <link href="/css/common.css" rel="stylesheet"> -->
-    <link href="/css/base.css" rel="stylesheet">
+    <link href="/css/common.css" rel="stylesheet">
+    <!-- <link href="/css/base.css" rel="stylesheet"> -->
 
 
     <!-- Scripts -->
     <script>
         window.Laravel = <?php echo json_encode([
             'csrfToken' => csrf_token(),
-        ]); ?>
+        ]); ?>;
+        Laravel.apiToken = "{{ Auth::check() ? 'Bearer '.Auth::user()->api_token : 'Bearer ' }}";
     </script>
 </head>
 <body>

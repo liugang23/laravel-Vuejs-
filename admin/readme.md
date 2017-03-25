@@ -2532,8 +2532,251 @@ __安装编辑插件__
     })->middleware('api');
 
 
-    
+#### 前后端分离 Api token 认证
+    * laravel 默认使用 api_token 字段
+    * 创建添加 api_token 表 用于向 User 添加 api_token
+    php artisan make:migration add_api_token_to_users --table=users
+    *编辑 AddApiTokenToUsers 表
+    <?php
+    use Illuminate\Support\Facades\Schema;
+    use Illuminate\Database\Schema\Blueprint;
+    use Illuminate\Database\Migrations\Migration;
 
+    class AddApiTokenToUsers extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('api_token', 64)->unique();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         * 删除
+         * @return void
+         */
+        public function down()
+        {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn(['api_token']);
+            });
+        }
+    }
+
+    * 执行 php artisan migrate 添加 api_token 字段
+    * 手工创建测试用 api_token 
+    首先执行 php artisan tinker 进入命令行
+    创建60位字符串 str_random(60)
+    然后将生成的字符串手工添加进 api_token 字段
+
+    * 修改注册用户表，添加api_token字段
+    protected function create(array $data)
+    {
+        // 判断邮箱是否存在
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            // 用户默认用户头像
+            'avatar' => '/images/avatart/user.png', // 头像目录
+            // 邮箱验证 token
+            'confirmation_token' => str_random(50), // 使用laravel 提供的函数生成50位的字串
+            'password' => bcrypt($data['password']),// 密码加密
+            'api_token' => str_random(60),// 添加用户认证api_token
+        ]);
+
+        // 邮件发送方法一 自定义发送邮件(不需要配置env文件)
+        // $this->emailSendToVerify($user);
+        // 邮件发送方法二 调用sendcloud 模板
+        $this->sendVerifyEmailTo($user);
+        return $user;
+    }
+
+    * 修改User model 添加 api_token 字段
+    * 进入 resources/assets/js/bootstrap.js 文件,添加自定义token
+    Vue.http.interceptors.push((request, next) => {
+        request.headers.set('X-CSRF-TOKEN', Laravel.csrfToken);
+        request.headers.set('Authorization', Laravel.apiToken);
+
+        next();
+    });
+    * 进入 app.blade.php 文件添加 apiToken
+    <script>
+        window.Laravel = <?php echo json_encode([
+            'csrfToken' => csrf_token(),
+        ]); ?>;
+        Laravel.apiToken = "{{ Auth::check() ? 'Bearer '.Auth::user()->api_token : 'Bearer ' }}";
+    </script>
+
+    * 修改 api 路由
+    <?php
+    use Illuminate\Http\Request;
+
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    })->middleware('auth:api');
+
+    Route::get('/topics', function (Request $request) {
+        $topics = \App\Models\topic::select(['id', 'name'])
+                ->where('name', 'like', '%'.$request->query('q').'%')
+                ->get();
+        return $topics;
+    })->middleware('api');
+
+    // 关注组件 勾子调用
+    Route::post('/question/follower', function (Request $request) {
+        $user = Auth::guard('api')->user();
+        $followed = $user->followed($request->get('question'));
+
+        if($followed) {
+            return response()->json(['followed' => true]);
+        }
+        return response()->json(['followed' => false]);
+        
+    })->middleware('auth:api');
+
+    // 关注 点击响应
+    Route::post('/question/follow', function (Request $request) {
+        $user = Auth::guard('api')->user();
+        $question = \App\Models\Question::find($request->get('question'));
+        $followed = $user->followThis($question->id);
+        
+        // $followed 返回两数组结果集 detached attached
+        // 对查询结果进行判断  非空 删除记录 改变状态
+        if(count($followed['detached'] > 0)) {
+            $question->decrement('followers_count');
+            return response()->json(['followed' => false]);
+        }
+        // 否则 创建记录
+        $question->increment('followers_count');
+        // 返回状态
+        return response()->json(['followed' => true]);
+
+    })->middleware('auth:api');
+
+    * 修改 show 视图
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        @foreach($question->topics as $topic)
+                            <a class="topic pull-right" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-body content">
+                        {!! $question->body !!}
+                    </div>
+                    <div class="edit-actions">
+                        @if(Auth::check() && Auth::user()->owns($question))
+                            <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                            <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                                {{ method_field('DELETE') }}
+                                {{ csrf_field() }}
+                                <button class="button is-naked delete-button">删 除</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 pull-right">
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>{{ $question->followers_count }}</h2>
+                        <span>关注者</span>
+                    </div>
+                    <div class="panel-body">
+                    @if(Auth::check())
+                        <question-follow-button question="{{$question->id}}"></question-follow-button>
+                        <a href="#editor" class="btn btn-primary">撰写答案</a>
+                    @else
+                        <a href="{{url('login')}}" class="btn btn-default">关注该问题</a>
+                        <a href="{{url('login')}}" class="btn btn-primary">撰写答案</a>
+                    @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->answers_count }}个回复
+                    </div>
+
+                    <div class="panel-body">
+                        @foreach($question->answers as $answer)
+                            <div class="media">
+                                <div class="media-left">
+                                    <a href="">
+                                        <img class="top-margin" width="36" src="{{ $answer->user->avatar }}" alt="{{ $answer->user->name }}">
+                                    </a>
+                                </div>
+                                <div class="media-body">
+                                    <h4 class="media-heading top-margin">
+                                        <a href="/user/{{ $answer->user->name }}">
+                                            {{ $answer->user->name }}
+                                        </a>
+                                    </h4>
+                                    {!! $answer->body !!}
+                                </div>
+                            </div>
+                        @endforeach
+                        @if(Auth::check())
+                        <form action="/questions/{{$question->id}}/answer" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:120px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">提交回复</button>
+                        </form>
+                        @else
+                        <a href="{{ url('login') }}" class="btn btn-success btn-block">登录提交答案</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+    </script>
+    @endsection
+
+    @endsection
 
 
 

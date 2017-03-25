@@ -75,6 +75,7 @@ class RegisterController extends Controller
             // 邮箱验证 token
             'confirmation_token' => str_random(50), // 使用laravel 提供的函数生成50位的字串
             'password' => bcrypt($data['password']),// 密码加密
+            'api_token' => str_random(60),// 添加用户认证api_token
         ]);
 
         // 邮件发送方法一 自定义发送邮件(不需要配置env文件)
