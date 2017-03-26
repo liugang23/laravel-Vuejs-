@@ -57,8 +57,10 @@ Route::post('/question/follow', function (Request $request) {
 
 })->middleware('auth:api');
 
-
+// 用户关注用户 初始化
 Route::get('/user/followers/{id}', 'Api\FollowersController@index');
+// 用户 关注\取消关注  用户 操作
 Route::post('/user/follow', 'Api\FollowersController@follow');
+
 
 

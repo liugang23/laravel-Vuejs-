@@ -36,4 +36,7 @@ Route::resource('/','Home\QuestionsController');
 
 	Route::get('question/{question}/follow', 'Home\FollowController@follow');
 
+// 站内通信路由
+Route::get('notifications', 'Home\NotificationsController@index');
+
 

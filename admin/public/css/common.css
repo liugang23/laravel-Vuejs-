@@ -38,3 +38,6 @@ a.topic:hover {
 .user-statics { display: flex; }
 .statics-item { padding: 2px 18px; }
 .statics-text { text-align: center; }
+.notifications {
+    margin: 1px 10px;
+}

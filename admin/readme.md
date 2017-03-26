@@ -3086,14 +3086,380 @@ __安装编辑插件__
 
 #### 用户关注组件化
     * 创建组件
+    <template>
+        <button
+            class="btn btn-default"
+            v-bind:class="{ 'btn-success': followed }"
+            v-text="text"
+            v-on:click="follow"
+        ></button>
+    </template>
+
+    <script>
+        export default {
+            props:['user'],
+            mounted() {
+                this.$http.get('/api/user/followers/' + this.user)
+                .then(response => {
+                    this.followed = response.data.followed
+                })
+
+            },
+            data() {
+                return { followed: false }
+            },
+            computed: {
+                text() {
+                    return this.followed ? '已关注' : '关注他'
+                }
+            },
+            methods: {
+                follow() {
+                    this.$http.post('/api/user/follow', {'user': this.user}).then(response => {
+                        this.followed = response.data.followed
+                    })
+                }
+            }
+        }
+
+    </script>
 
     * 添加路由
-
+    // 用户关注用户 初始化
+    Route::get('/user/followers/{id}', 'Api\FollowersController@index');
+    // 用户 关注\取消关注  用户 操作
+    Route::post('/user/follow', 'Api\FollowersController@follow');
+    
     * 创建控制器
+    php artisan make:controller Api\\FollowersController
 
     * 编辑控制器
+    <?php
+    namespace App\Http\Controllers\Api;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use App\Repositories\UserRepository;
+    use Auth;
+
+    class FollowersController extends Controller
+    {
+        protected $user;
+        /**
+         * FollowersController constructor
+         * @param $user
+         */
+        public function __construct(UserRepository $user)
+        {
+            $this->user = $user;
+        }
+
+        public function index($id)
+        {
+            $user = $this->user->getUserId($id);
+            // 查询用户是否存在于 用户-用户关注表中
+            // 从数据表中取得单一数据列的单一字段
+            $followers = $user->followersUser()->pluck('follower_id')->toArray();
+            // 对查询结果进行判断
+            if(in_array(Auth::guard('api')->user()->id, $followers)) {
+                return response()->json(['followed'=>true]);
+            }
+
+            return response()->json(['followed'=>false]);
+        }
+
+        public function follow(Request $request)
+        {
+            // return $request->get('user');
+            $userToFollow = $this->user->getUserId(request('user'));
+            $followed = Auth::guard('api')->user()
+                            ->followThisUser($userToFollow->id);
+            // attached 大于0  关注
+            if (count($followed['attached']) > 0) {
+                // 发送私信
+
+                $userToFollow->increment('followers_count');
+
+                return response()->json(['followed' => true]);
+            }
+
+            $userToFollow->decrement('followers_count');
+
+            return response()->json(['followed' => false]);
+
+        }
+    }
+
+    * 新建 UserRepository.php 并编辑
+    <?php
+    namespace App\Repositories;
+
+    use App\User;
+
+    class UserRepository
+    {
+        public function getUserId($id)
+        {
+            return User::find($id);
+        }
+    }
+
+    * 编辑 questions 目录下 show 视图
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->title }}
+                        @foreach($question->topics as $topic)
+                            <a class="topic pull-right" href="/topic/{{ $topic->id }}">{{ $topic->name }}</a>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-body content">
+                        {!! $question->body !!}
+                    </div>
+                    <div class="edit-actions">
+                        @if(Auth::check() && Auth::user()->owns($question))
+                            <span class="edif"><a href="/questions/{{ $question->id }}/edit">编 辑</a></span>
+                            <form action="/questions/{{$question->id}}" method="post" class="delete-form">
+                                {{ method_field('DELETE') }}
+                                {{ csrf_field() }}
+                                <button class="button is-naked delete-button">删 除</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 pull-right">
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>{{ $question->followers_count }}</h2>
+                        <span>关注者</span>
+                    </div>
+                    <div class="panel-body">
+                    @if(Auth::check())
+                        <question-follow-button question="{{$question->id}}"></question-follow-button>
+                        <a href="#editor" class="btn btn-primary pull-right">撰写答案</a>
+                    @else
+                        <a href="{{url('login')}}" class="btn btn-default">关注该问题</a>
+                        <a href="{{url('login')}}" class="btn btn-primary pull-right">撰写答案</a>
+                    @endif
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading question-follow">
+                        <h2>关于作者</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-body">
+                            <div class="media-left">
+                                <a href="#">
+                                    <img width="36" src="{{$question->user->avatar}}" alt="{{$question->user->name}}">
+                                </a>
+                            </div>
+                            <div class="media-body">
+                                <h4 class="media-heading">
+                                    <a href="">{{ $question->user->name }}</a>
+                                </h4>
+                            </div>
+                            <div class="user-statics">
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">问题</div>
+                                    <div class="statics-count">{{ $question->user->questions_count }}</div>
+                                </div>
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">回答</div>
+                                    <div class="statics-count">{{ $question->user->answers_count }}</div>
+                                </div>
+                                <div class="statics-item text-center">
+                                    <div class="statics-text">关注</div>
+                                    <div class="statics-count">{{ $question->user->followers_count }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <user-follow-button user="{{$question->user_id}}"></user-follow-button>
+                        <a href="#editor" class="btn btn-default pull-right">发送私信</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8 col-md-offset-1">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        {{ $question->answers_count }}个回复
+                    </div>
+
+                    <div class="panel-body">
+                        @foreach($question->answers as $answer)
+                            <div class="media">
+                                <div class="media-left">
+                                    <a href="">
+                                        <img class="top-margin" width="36" src="{{ $answer->user->avatar }}" alt="{{ $answer->user->name }}">
+                                    </a>
+                                </div>
+                                <div class="media-body">
+                                    <h4 class="media-heading top-margin">
+                                        <a href="/user/{{ $answer->user->name }}">
+                                            {{ $answer->user->name }}
+                                        </a>
+                                    </h4>
+                                    {!! $answer->body !!}
+                                </div>
+                            </div>
+                        @endforeach
+                        @if(Auth::check())
+                        <form action="/questions/{{$question->id}}/answer" method="post">
+                            {!! csrf_field() !!}
+                            <div class="form-group{{ $errors->has('body') ? 'has-error' : '' }}">
+                                <!-- 编辑器容器 -->
+                                <!-- 非转义可能引起攻击,需要过滤 -->
+                                <script id="container" name="body" type="text/plain" style="height:120px;">
+                                    {!! old('body') !!}
+                                </script>
+                                @if ($errors->has('body'))
+                                    <span class="help-block">
+                                        <strong>{{ $errors->first('body') }}</strong>
+                                    </span>
+                                @endif
+                            </div>
+                            <button class="btn btn-success pull-right" type="submit">提交回复</button>
+                        </form>
+                        @else
+                        <a href="{{ url('login') }}" class="btn btn-success btn-block">登录提交答案</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @section('js')
+    <!-- 实例化编辑器 -->
+    <script type="text/javascript">
+        var ue = UE.getEditor('container', {
+            toolbars: [
+                    ['bold', 'italic', 'underline', 'strikethrough', 'blockquote', 'insertunorderedlist', 'insertorderedlist', 'justifyleft','justifycenter', 'justifyright',  'link', 'insertimage', 'fullscreen']
+                ],
+            elementPathEnabled: false,
+            enableContextMenu: false,
+            autoClearEmptyNode:true,
+            wordCount:false,
+            imagePopup:false,
+            autotypeset:{ indent: true,imageBlockLine: 'center' }
+        });
+        ue.ready(function() {
+            ue.execCommand('serverparam', '_token', '{{ csrf_token() }}'); // 设置 CSRF token.
+        });
+    </script>
+    @endsection
+
+    @endsection
 
 
+#### 站内通信
+    __站内通信需要用到laravel 5.3 新特性__
+    * 新建站内通信
+    php artisan make:notification NewUserFollowNotification
+
+    * 新建站内通信 数据表
+    php artisan notifications:table
+
+    * 执行命令创建表
+    php artisan migrate
+
+    * 编辑 Notifications 目录下的 NewUserFollowNotification
+
+    * 新建站内通信控制器
+    php artisan make:controller Home\\NotificationsController
+
+    <?php
+    namespace App\Http\Controllers\Home;
+
+    use Illuminate\Http\Request;
+    use App\Http\Controllers\Controller;
+    use Auth;
+
+    class NotificationsController extends Controller
+    {
+        public function index()
+        {
+            $user = Auth::user();
+            return view('notifications.index', compact('user'));
+        }
+    }
+
+    * views 目录下新建 notifications/index.blade.php 并查看类型
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">消息通知</div>
+                    <div class="panel-body">
+                        @foreach($user->notifications as $notification)
+                            {{ $notification->type }}
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endsection
+
+    * 创建合适的消息通知模板
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">控制面板</div>
+
+                    <div class="panel-body">
+                        @foreach($user->notifications as $notification)
+                            {{ snake_case(class_basename($notification->type)) }}
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endsection
+
+    * 根据返回的内容 创建消息通知模板
+    <li class="notifications">
+        <a href="{{ $notification->data['name'] }}">{{ $notification->data['name'] }}</a> 关注了你。
+    </li>
+
+    * 修改 views 目录下新建 notifications/index.blade.php
+    @extends('layouts.app')
+
+    @section('content')
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <div class="panel panel-default">
+                    <div class="panel-heading">消息通知</div>
+
+                    <div class="panel-body">
+                        @foreach($user->notifications as $notification)
+                        <!-- 根据snake_case(class_basename($notification->type))引用不同的视图 -->
+                            @include('notifications.'.snake_case(class_basename($notification->type)))
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endsection
+
+#### 关注用户邮件通知
 
 
 

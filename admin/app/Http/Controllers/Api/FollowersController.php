@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Repositories\UserRepository;
+use App\Notifications\NewUserFollowNotification;
 use Auth;
 
 class FollowersController extends Controller
@@ -35,14 +35,15 @@ class FollowersController extends Controller
 
     public function follow(Request $request)
     {
-    	// return $request->get('user');
     	$userToFollow = $this->user->getUserId(request('user'));
+
     	$followed = Auth::guard('api')->user()
-    					->followThisUser($userToFollow->id);
+    					 ->followThisUser($userToFollow->id);
+
     	// attached 大于0  关注
     	if (count($followed['attached']) > 0) {
     		// 发送私信
-
+            $userToFollow->notify(new NewUserFollowNotification());
     		$userToFollow->increment('followers_count');
 
     		return response()->json(['followed' => true]);
