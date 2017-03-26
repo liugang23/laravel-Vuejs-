@@ -10,6 +10,7 @@
                 <div class="panel-body">
                     @foreach($user->notifications as $notification)
                     <!-- 根据snake_case(class_basename($notification->type))引用不同的视图 -->
+                    <!-- {{ snake_case(class_basename($notification->type)) }} -->
                         @include('notifications.'.snake_case(class_basename($notification->type)))
                     @endforeach
                 </div>

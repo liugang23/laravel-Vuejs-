@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Repositories\UserRepository;
 use App\Notifications\NewUserFollowNotification;
 use Auth;
+use Illuminate\Support\Facades\Notification;
 
 class FollowersController extends Controller
 {
@@ -43,12 +44,17 @@ class FollowersController extends Controller
     	// attached 大于0  关注
     	if (count($followed['attached']) > 0) {
     		// 发送私信
-            $userToFollow->notify(new NewUserFollowNotification());
+            // 通知可以通过两种方式发送：使用Notifiabletrait提供的notify方法或者使用Notification门面
+            // 记住，你可以在任何模型中使用Illuminate\Notifications\Notifiabletrait，不限于只在User模型中使用
+            // $userToFollow->notify(new NewUserFollowNotification());
+            // 使用Notification门面
+            Notification::send($userToFollow, new NewUserFollowNotification());
     		$userToFollow->increment('followers_count');
 
     		return response()->json(['followed' => true]);
     	}
-
+        // 修改私信状态
+        \DB::table('notifications')->update(['state'=>'F']);
     	$userToFollow->decrement('followers_count');
 
     	return response()->json(['followed' => false]);

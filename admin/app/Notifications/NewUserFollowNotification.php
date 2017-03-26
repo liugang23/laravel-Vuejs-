@@ -30,8 +30,8 @@ class NewUserFollowNotification extends Notification
      */
     public function via($notifiable)
     {
-        // return ['mail'];
-        return ['database'];
+        // return ['mail'];// 默认 email
+        return ['database'];// 这里使用数据库
     }
 
     /**

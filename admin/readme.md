@@ -3367,10 +3367,121 @@ __安装编辑插件__
     * 新建站内通信 数据表
     php artisan notifications:table
 
+    * 编辑数据表
+    <?php
+
+    use Illuminate\Database\Schema\Blueprint;
+    use Illuminate\Database\Migrations\Migration;
+
+    class CreateNotificationsTable extends Migration
+    {
+        /**
+         * Run the migrations.
+         *
+         * @return void
+         */
+        public function up()
+        {
+            Schema::create('notifications', function (Blueprint $table) {
+                $table->uuid('id')->primary();
+                $table->string('type');
+                $table->morphs('notifiable');
+                $table->text('data');
+                // 关注状态，关注  取消关注
+                $table->string('state',8)->default('T');
+                $table->timestamp('read_at')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        /**
+         * Reverse the migrations.
+         *
+         * @return void
+         */
+        public function down()
+        {
+            Schema::dropIfExists('notifications');
+        }
+    }
+
     * 执行命令创建表
     php artisan migrate
 
     * 编辑 Notifications 目录下的 NewUserFollowNotification
+    <?php
+    namespace App\Notifications;
+
+    use Illuminate\Bus\Queueable;
+    use Illuminate\Notifications\Notification;
+    use Illuminate\Contracts\Queue\ShouldQueue;
+    use Illuminate\Notifications\Messages\MailMessage;
+    use Auth;
+
+    class NewUserFollowNotification extends Notification
+    {
+        use Queueable;
+
+        /**
+         * Create a new notification instance.
+         *
+         * @return void
+         */
+        public function __construct()
+        {
+            //
+        }
+
+        /**
+         * Get the notification's delivery channels.
+         *
+         * @param  mixed  $notifiable
+         * @return array
+         */
+        public function via($notifiable)
+        {
+            // return ['mail'];// 默认 email
+            return ['database'];// 这里使用数据库
+        }
+
+        /**
+         * 记录到数据库
+         */
+        public function toDatabase($notifiable)
+        {
+            return [
+                // 发起关注请求 用户的名字
+                'name' => Auth::guard('api')->user()->name,
+            ];
+        }
+
+        /**
+         * Get the mail representation of the notification.
+         *
+         * @param  mixed  $notifiable
+         * @return \Illuminate\Notifications\Messages\MailMessage
+         */
+        public function toMail($notifiable)
+        {
+            return (new MailMessage)
+                        ->line('The introduction to the notification.')
+                        ->action('Notification Action', 'https://laravel.com')
+                        ->line('Thank you for using our application!');
+        }
+
+        /**
+         * Get the array representation of the notification.
+         *
+         * @param  mixed  $notifiable
+         * @return array
+         */
+        public function toArray($notifiable)
+        {
+            return [
+                //
+            ];
+        }
+    }
 
     * 新建站内通信控制器
     php artisan make:controller Home\\NotificationsController
@@ -3411,7 +3522,7 @@ __安装编辑插件__
     </div>
     @endsection
 
-    * 创建合适的消息通知模板
+    * 查看返回结果 创建合适的消息通知模板 
     @extends('layouts.app')
 
     @section('content')
@@ -3419,7 +3530,7 @@ __安装编辑插件__
         <div class="row">
             <div class="col-md-8 col-md-offset-2">
                 <div class="panel panel-default">
-                    <div class="panel-heading">控制面板</div>
+                    <div class="panel-heading">消息通知</div>
 
                     <div class="panel-body">
                         @foreach($user->notifications as $notification)
@@ -3432,10 +3543,20 @@ __安装编辑插件__
     </div>
     @endsection
 
-    * 根据返回的内容 创建消息通知模板
+    * 根据返回的内容 创建消息通知模板 new_user_follow_notification.blade.php
+    @if($notification->state == 'T')
     <li class="notifications">
-        <a href="{{ $notification->data['name'] }}">{{ $notification->data['name'] }}</a> 关注了你。
+        <a href="{{ $notification->data['name'] }}">
+            {{ $notification->data['name'] }}
+        </a> &nbsp; <?php echo date("Y-m-d H:i:s", time()); ?> 关注了你。
     </li>
+    @else
+    <li class="notifications">
+        <a href="{{ $notification->data['name'] }}">
+            {{ $notification->data['name'] }}
+        </a> &nbsp; <?php echo date("Y-m-d H:i:s", time()); ?> 取消对你的关注。
+    </li>
+    @endif
 
     * 修改 views 目录下新建 notifications/index.blade.php
     @extends('layouts.app')

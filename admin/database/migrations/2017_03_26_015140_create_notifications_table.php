@@ -17,6 +17,8 @@ class CreateNotificationsTable extends Migration
             $table->string('type');
             $table->morphs('notifiable');
             $table->text('data');
+            // 关注状态，关注  取消关注
+            $table->string('state',8)->default('T');
             $table->timestamp('read_at')->nullable();
             $table->timestamps();
         });
