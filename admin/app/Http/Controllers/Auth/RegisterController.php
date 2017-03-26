@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use App\Tools\EMAILResult;
-use Naux\Mail\SendCloudTemplate;
+use App\Mailer\SendMailer;
 use Mail;
 
 class RegisterController extends Controller
@@ -85,6 +85,9 @@ class RegisterController extends Controller
         return $user;
     }
 
+    /**
+     * 发送注册  邮件验证
+     */
     private function emailSendToVerify($user)
     {
         // 邮件内容
@@ -102,20 +105,11 @@ class RegisterController extends Controller
 
     }
 
+    /**
+     * 发送注册  邮件验证
+     */
     private function sendVerifyEmailTo($user)
     {
-        $data = [
-            'url'=>route('email.verify',['token'=>$user->confirmation_token]),
-            'name'=>$user->name
-        ];
-        // 选择模板
-        $template = new SendCloudTemplate('test_template', $data);
-        // 发送邮件
-        Mail::raw($template, function ($message) use ($user) {
-            // 邮件发送者
-            $message->from('3434744@qq.com', '幸福号'); 
-            // 邮件接收者
-            $message->to($user->email);
-        });
+        (new SendMailer())->welcome($user);
     }
 }

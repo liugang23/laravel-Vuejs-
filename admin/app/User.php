@@ -3,10 +3,10 @@ namespace App;
 
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Naux\Mail\SendCloudTemplate;
-use Mail;
 use Illuminate\Database\Eloquent\Model;
+use App\Mailer\SendMailer;
 use App\Models\Follow;
+use Mail;
 
 class User extends Authenticatable
 {
@@ -108,17 +108,7 @@ class User extends Authenticatable
      */
     public function sendPasswordResetNotification($token)
     {
-        $data = ['url'=>url('password/reset', $token)];
-        // 选择模板
-        $template = new SendCloudTemplate('password_reset', $data);
-        // 发送邮件
-        Mail::raw($template, function ($message) {
-            // 邮件发送者
-            $message->from('3434744@qq.com', '幸福号'); 
-            // 邮件接收者
-            $message->to($this->email);
-        });
-
+        (new SendMailer())->passwordReset($this->email, $token);
     }
 
 }

@@ -3736,6 +3736,115 @@ __安装编辑插件__
     }
 
 #### 重构邮件通知
+    * 创建邮件发送目录 Mailer 和基类 Mailer.php
+    <?php
+    namespace App\Mailer;
 
+    use Mail;
+    use Naux\Mail\SendCloudTemplate;
+
+    class Mailer
+    {
+        public function sendTo($template, $email, array $data)
+        {
+            $content = new SendCloudTemplate($template, $data);
+
+            Mail::raw($content, function ($message) use ($email) {
+                $message->from('3434744@qq.com', '幸福号');
+                $message->to($email);
+            });
+        }
+    }
+
+    * 新建邮件发送文件 sendMailer.php
+    <?php
+    namespace App\Mailer;
+
+    use App\User;
+    use Auth;
+
+    class SendMailer extends Mailer
+    {
+        /**
+         * 用户关注 邮件发送
+         */
+        public function followNotifyEmail($email)
+        {
+            $data = ['url'=>'http://www.zt.com', 'name'=>Auth::guard('api')->user()->name];
+
+            $this->sendTo('app_new_user_follow', $email, $data);
+        }
+
+        /**
+         * 密码重置 邮件发送
+         */
+        public function passwordReset($email, $token)
+        {
+            $data = ['url'=>url('password/reset', $token)];
+
+            $this->sendTo('password_reset', $email, $data);
+        }
+
+        /**
+         * 注册 邮件发送
+         */
+        public function welcome(User $user)
+        {
+            $data = [
+                'url'=>route('email.verify',['token'=>$user->confirmation_token]),
+                'name'=>$user->name
+            ];
+
+            $this->sendTo('test_template', $user->email, $data);
+        }
+
+    }
+
+    * User.php 密码重置 邮件发送
+    /**
+     * laravel 不支持sendCloud 模板 重写重置密码邮件发送
+     */
+    use App\Mailer\SendMailer;
+
+    public function sendPasswordResetNotification($token)
+    {
+        (new SendMailer())->passwordReset($this->email, $token);
+    }
+
+    * RegisterController.php 注册 邮件发送
+    /**
+     * 发送注册  邮件验证
+     */
+    use App\Mailer\SendMailer;
+
+    private function sendVerifyEmailTo($user)
+    {
+        (new SendMailer())->welcome($user);
+    }
+
+    * NewUserFollowNotification.php 关注用户 邮件发送
+    /**
+     * 发送邮件
+     */
+    use App\Mailer\SendMailer;
+
+    public function toSendcloud($notifiable)
+    {
+        (new SendMailer())->followNotifyEmail($notifiable->email);
+    }
+
+#### 对答案点赞
+    * 创建点赞 model (-m 创建与model同名数据库表)
+    php artisan make:model Vote -m
+
+    * 执行命令创建表
+
+    * 建立多对多关系 
+
+    * 创建点赞组件
+
+    * 创建点赞 api路由
+
+    * 创建点赞控制器
 
 

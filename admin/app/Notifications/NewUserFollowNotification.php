@@ -8,7 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use App\Tools\EMAILResult;
 use App\Channels\SendcloudChannel;
-use Naux\Mail\SendCloudTemplate;
+use App\Mailer\SendMailer;
 use Auth;
 use Mail;
 
@@ -69,14 +69,7 @@ class NewUserFollowNotification extends Notification
         // });
 
         /* 使用Sendcloud 的模板发送邮件 */
-        $data = ['url'=>'http://www.zt.com', 'name'=>Auth::guard('api')->user()->name];
-        $template = new SendcloudTemplate('app_new_user_follow', $data);
-        Mail::raw($template, function ($message) use ($notifiable) {
-            // 邮件发送者
-            $message->from('3434744@qq.com', '幸福号'); 
-            // 邮件接收者
-            $message->to($notifiable->email);
-        });
+        (new SendMailer())->followNotifyEmail($notifiable->email);
     }
 
     /**
