@@ -6,7 +6,11 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
+use App\Tools\EMAILResult;
+use App\Channels\SendcloudChannel;
+use Naux\Mail\SendCloudTemplate;
 use Auth;
+use Mail;
 
 class NewUserFollowNotification extends Notification
 {
@@ -31,7 +35,7 @@ class NewUserFollowNotification extends Notification
     public function via($notifiable)
     {
         // return ['mail'];// 默认 email
-        return ['database'];// 这里使用数据库
+        return ['database', SendcloudChannel::class];// 这里使用数据库
     }
 
     /**
@@ -46,6 +50,36 @@ class NewUserFollowNotification extends Notification
     }
 
     /**
+     * 发送邮件
+     */
+    public function toSendcloud($notifiable)
+    {
+        /* 自定义模板发送邮件 */
+        // 邮件内容
+        // $EMAILResult = new EMAILResult();
+        // $EMAILResult->to = Auth::guard('api')->user()->email;
+        // $EMAILResult->cc = '3434744@qq.com';
+        // $EMAILResult->subject = '用户关注提示';
+        // $EMAILResult->content = '你好,知乎app上 '.Auth::guard('api')->user()->name.' 关注了你';
+        // 发送邮件
+        // Mail::send('email_follow', ['EMAILResult' => $EMAILResult], function($m) use ($EMAILResult) {
+        //     $m->to($EMAILResult->to, '尊敬的用户')
+        //     ->cc($EMAILResult->cc)
+        //     ->subject($EMAILResult->subject);
+        // });
+
+        /* 使用Sendcloud 的模板发送邮件 */
+        $data = ['url'=>'http://www.zt.com', 'name'=>Auth::guard('api')->user()->name];
+        $template = new SendcloudTemplate('app_new_user_follow', $data);
+        Mail::raw($template, function ($message) use ($notifiable) {
+            // 邮件发送者
+            $message->from('3434744@qq.com', '幸福号'); 
+            // 邮件接收者
+            $message->to($notifiable->email);
+        });
+    }
+
+    /**
      * Get the mail representation of the notification.
      *
      * @param  mixed  $notifiable
@@ -53,10 +87,10 @@ class NewUserFollowNotification extends Notification
      */
     public function toMail($notifiable)
     {
-        return (new MailMessage)
-                    ->line('The introduction to the notification.')
-                    ->action('Notification Action', 'https://laravel.com')
-                    ->line('Thank you for using our application!');
+        // return (new MailMessage)
+        //             ->line('The introduction to the notification.')
+        //             ->action('Notification Action', 'https://laravel.com')
+        //             ->line('Thank you for using our application!');
     }
 
     /**

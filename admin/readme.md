@@ -3581,7 +3581,161 @@ __安装编辑插件__
     @endsection
 
 #### 关注用户邮件通知
+    * 因为laravel 不支持邮件模板发送，所以需要先定义一个模板
+    * 首先自定义一个 Channels 目录
+    * 定义一个邮件发送类 SendcloudChannel.php
+    * 编辑 SendcloudChannel.php
+    <?php
+    namespace App\Channels;
 
+    use Illuminate\Notifications\Notification;
+
+    class SendcloudChannel
+    {
+        public function send($notifiable, Notification $notification)
+        {
+            $message = $notification->toSendCloud($notifiable);
+        }
+    }
+
+    * 在NewUserFollowNotification.php 中添加邮件发送服务
+    <?php
+    namespace App\Notifications;
+
+    use Illuminate\Bus\Queueable;
+    use Illuminate\Notifications\Notification;
+    use Illuminate\Contracts\Queue\ShouldQueue;
+    use Illuminate\Notifications\Messages\MailMessage;
+    use App\Tools\EMAILResult;
+    use App\Channels\SendcloudChannel;
+    use Naux\Mail\SendCloudTemplate;
+    use Auth;
+    use Mail;
+
+    class NewUserFollowNotification extends Notification
+    {
+        use Queueable;
+
+        /**
+         * Create a new notification instance.
+         *
+         * @return void
+         */
+        public function __construct()
+        {
+            //
+        }
+
+        /**
+         * Get the notification's delivery channels.
+         *
+         * @param  mixed  $notifiable
+         * @return array
+         */
+        public function via($notifiable)
+        {
+            // return ['mail'];// 默认 email
+            return ['database', SendcloudChannel::class];// 这里使用数据库
+        }
+
+        /**
+         * 记录到数据库
+         */
+        public function toDatabase($notifiable)
+        {
+            return [
+                // 发起关注请求 用户的名字
+                'name' => Auth::guard('api')->user()->name,
+            ];
+        }
+
+        /**
+         * 发送邮件
+         */
+        public function toSendcloud($notifiable)
+        {
+            /* 自定义模板发送邮件 */
+            // 邮件内容
+            // $EMAILResult = new EMAILResult();
+            // $EMAILResult->to = Auth::guard('api')->user()->email;
+            // $EMAILResult->cc = '3434744@qq.com';
+            // $EMAILResult->subject = '用户关注提示';
+            // $EMAILResult->content = '你好,知乎app上 '.Auth::guard('api')->user()->name.' 关注了你';
+            // 发送邮件
+            // Mail::send('email_follow', ['EMAILResult' => $EMAILResult], function($m) use ($EMAILResult) {
+            //     $m->to($EMAILResult->to, '尊敬的用户')
+            //     ->cc($EMAILResult->cc)
+            //     ->subject($EMAILResult->subject);
+            // });
+
+            /* 使用Sendcloud 的模板发送邮件 */
+            $data = ['url'=>'http://www.zt.com', 'name'=>Auth::guard('api')->user()->name];
+            $template = new SendcloudTemplate('app_new_user_follow', $data);
+            Mail::raw($template, function ($message) use ($notifiable) {
+                // 邮件发送者
+                $message->from('3434744@qq.com', '幸福号'); 
+                // 邮件接收者
+                $message->to($notifiable->email);
+            });
+        }
+
+        /**
+         * Get the mail representation of the notification.
+         *
+         * @param  mixed  $notifiable
+         * @return \Illuminate\Notifications\Messages\MailMessage
+         */
+        public function toMail($notifiable)
+        {
+            // return (new MailMessage)
+            //             ->line('The introduction to the notification.')
+            //             ->action('Notification Action', 'https://laravel.com')
+            //             ->line('Thank you for using our application!');
+        }
+
+        /**
+         * Get the array representation of the notification.
+         *
+         * @param  mixed  $notifiable
+         * @return array
+         */
+        public function toArray($notifiable)
+        {
+            return [
+                //
+            ];
+        }
+    }
+
+    * FollowersController.php 在用户关注的情况下，触发邮件发送 
+    public function follow(Request $request)
+    {
+        $userToFollow = $this->user->getUserId(request('user'));
+
+        $followed = Auth::guard('api')->user()
+                         ->followThisUser($userToFollow->id);
+
+        // attached 大于0  关注
+        if (count($followed['attached']) > 0) {
+            // 发送私信
+            // 通知可以通过两种方式发送：使用Notifiabletrait提供的notify方法或者使用Notification门面
+            // 记住，你可以在任何模型中使用Illuminate\Notifications\Notifiabletrait，不限于只在User模型中使用
+            // $userToFollow->notify(new NewUserFollowNotification());
+            // 使用Notification门面
+            Notification::send($userToFollow, new NewUserFollowNotification());
+            $userToFollow->increment('followers_count');
+
+            return response()->json(['followed' => true]);
+        }
+        // 修改私信状态
+        \DB::table('notifications')->update(['state'=>'F']);
+        $userToFollow->decrement('followers_count');
+
+        return response()->json(['followed' => false]);
+
+    }
+
+#### 重构邮件通知
 
 
 
